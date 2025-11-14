@@ -1,0 +1,2300 @@
+[
+  {
+    "pr_id": "fastapi/fastapi#14176",
+    "repository": "fastapi/fastapi",
+    "pr_number": 14176,
+    "title": "📝 Replace `starlette.io` by `starlette.dev` and `uvicorn.org` by `uvicorn.dev`",
+    "description": "",
+    "author": "Kludex",
+    "created_at": "2025-10-11T14:44:40+00:00",
+    "merged_at": "2025-10-11T17:48:49+00:00",
+    "url": "https://github.com/fastapi/fastapi/pull/14176",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "tiangolo",
+        "timestamp": "2025-10-11T17:48:01+00:00",
+        "content": "Thank you! ✔️ ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 288,
+      "loc_deleted": 288,
+      "num_files": 214,
+      "num_review_comments": 1,
+      "labels": [
+        "docs"
+      ]
+    }
+  },
+  {
+    "pr_id": "fastapi/fastapi#14165",
+    "repository": "fastapi/fastapi",
+    "pr_number": 14165,
+    "title": "⬆️ Add support for Python 3.14",
+    "description": "Add Python 3.14 to the test suite & `pyproject.toml`.\r\n\r\nNote that Pydantic v1 won't be supported on Python 3.14: https://github.com/pydantic/pydantic/issues/11613#issuecomment-3242513660\r\n\r\nPutting this in draft until:\r\n\r\n- [x] A non-rc runner becomes available\r\n- [x] Pydantic 2.12.0 is out\r\n- [x] https://github.com/fastapi/fastapi/pull/14036 is merged for compatibility with Pydantic 2.12.0\r\n- [x] https://github.com/fastapi/sqlmodel/pull/1578  is merged & released to fix Python 3.14 `mypy` errors\r\n- [x] The \"unraisable exception warnings\" stuff is addressed",
+    "author": "svlandeg",
+    "created_at": "2025-10-07T14:54:58+00:00",
+    "merged_at": "2025-10-10T09:44:40+00:00",
+    "url": "https://github.com/fastapi/fastapi/pull/14165",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "tiangolo",
+        "timestamp": "2025-10-10T09:38:53+00:00",
+        "content": "Awesome, thank you! 🚀 ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 10,
+      "loc_deleted": 1,
+      "num_files": 5,
+      "num_review_comments": 1,
+      "labels": [
+        "upgrade"
+      ]
+    }
+  },
+  {
+    "pr_id": "fastapi/fastapi#12942",
+    "repository": "fastapi/fastapi",
+    "pr_number": 12942,
+    "title": "🐛 Fix tagged discriminated union not recognized as body field",
+    "description": "## Problem\r\n\r\nWhen using a union type models with a tagged discriminator as an endpoint parameter, like the following:\r\n\r\n```py\r\nclass Pie(BaseModel):\r\n    time_to_cook: int\r\n    num_ingredients: int\r\n\r\n\r\nclass ApplePie(Pie):\r\n    fruit: Literal[\"apple\"] = \"apple\"\r\n\r\n\r\nclass PumpkinPie(Pie):\r\n    filling: Literal[\"pumpkin\"] = \"pumpkin\"\r\n\r\n\r\ndef get_discriminator_value(v: Any) -> str:\r\n    if isinstance(v, dict):\r\n        return v.get(\"fruit\", v.get(\"filling\"))\r\n    return getattr(v, \"fruit\", getattr(v, \"filling\", None))\r\n\r\n\r\nDessert = Annotated[\r\n    Annotated[ApplePie, Tag(\"apple\")] | Annotated[PumpkinPie, Tag(\"pumpkin\")],\r\n    Discriminator(get_discriminator_value),\r\n]\r\n\r\n\r\napp = FastAPI()\r\n@app.post(\"/dessert\")\r\nasync def dinner(dessert: Dessert) -> dict[str, Any]:\r\n    return dessert.model_dump()\r\n```\r\n\r\nFastAPI fails to identify it correctly as **body** payload. It incorrectly considers it's a query parameter, which then causes a validation error. The workaround currently is to explicitly tell FastAPI it's a body parameter using `dessert: Annotated[Dessert, Body()]`\r\n\r\n## Fix\r\n\r\nThe solution is to improve the function handling type annotations by handling the case where we can have `Annotated`\r\n types inside an `Annotated` type.\r\n\r\n---\r\n\r\nDiscussed in https://github.com/fastapi/fastapi/discussions/12941",
+    "author": "frankie567",
+    "created_at": "2024-11-15T15:43:59+00:00",
+    "merged_at": "2025-10-08T14:48:30+00:00",
+    "url": "https://github.com/fastapi/fastapi/pull/12942",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "YuriiMotov",
+        "timestamp": "2025-07-08T19:24:25+00:00",
+        "content": "LGTM\r\n\r\nActually, this problem is related to Pydantic V1 as well.\r\nIt can be tested using the following dummy test (in details)\r\n\r\n<details>\r\n\r\n```python\r\nfrom typing import Annotated, Union\r\n\r\nfrom fastapi import FastAPI\r\nfrom fastapi.testclient import TestClient\r\nfrom pydantic import BaseModel, Field\r\n\r\n\r\nclass Item(BaseModel):\r\n    value: str\r\n\r\nItemUnion = Union[\r\n    Annotated[Item, Field()],\r\n    Annotated[Item, Field()],\r\n]\r\n\r\napp = FastAPI()\r\n\r\n\r\n@app.post(\"/items/\")\r\ndef save(item: ItemUnion): # Changing this to `item: ItemUnion = Body()` would fix\r\n    return {\"item\": item}\r\n\r\n# Tests\r\n\r\n\r\ndef test_() -> None:\r\n    client = TestClient(app)\r\n    response = client.post(\"/items/\", json={\"value\": \"item\"})\r\n    assert response.status_code == 200, response.text\r\n    assert response.json() == {\"item\": {\"value\": \"item\"}}\r\n\r\n```\r\n\r\n</details>\r\n\r\nBut I don't think we need to fix this for Pydantic V1 now. I can't imagine any real-life use case with Pydantic V1.",
+        "state": "APPROVED",
+        "type": "general"
+      },
+      {
+        "reviewer": "patrick91",
+        "timestamp": "2025-10-07T13:16:32+00:00",
+        "content": "Just tested this in our codebase and it works!\r\n\r\nI also checked that the new tests were not passing on the main branch 😊\r\n\r\nEDIT: Also updated the test to make sure query params still work when using Annotated\r\n",
+        "state": "APPROVED",
+        "type": "general"
+      },
+      {
+        "reviewer": "tiangolo",
+        "timestamp": "2025-10-08T14:25:04+00:00",
+        "content": "Cool, thanks @frankie567! 🚀 \r\n\r\nAnd thanks @YuriiMotov and @patrick91 for the help!\r\n\r\nI realized that the tests were also passing on master 😅 \r\n\r\nSo, I updated them to make them fail on master (adding the `Tag`) and get fixed by this change.\r\n\r\nThis will be released in FastAPI 0.118.2 in the next hours. 🎉 \r\n\r\n---\r\n\r\n~Ups, it seems I broke the tests, let me check that first.~ Fixed. :sweat_smile: ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 191,
+      "loc_deleted": 0,
+      "num_files": 2,
+      "num_review_comments": 3,
+      "labels": [
+        "bug"
+      ]
+    }
+  },
+  {
+    "pr_id": "fastapi/fastapi#14167",
+    "repository": "fastapi/fastapi",
+    "pr_number": 14167,
+    "title": "⬆ Bump astral-sh/setup-uv from 6 to 7",
+    "description": "Bumps [astral-sh/setup-uv](https://github.com/astral-sh/setup-uv) from 6 to 7.\n<details>\n<summary>Release notes</summary>\n<p><em>Sourced from <a href=\"https://github.com/astral-sh/setup-uv/releases\">astral-sh/setup-uv's releases</a>.</em></p>\n<blockquote>\n<h2>v7.0.0 🌈 node24 and a lot of bugfixes</h2>\n<h2>Changes</h2>\n<p>This release comes with a load of bug fixes and a speed up. Because of switching from node20 to node24 it is also a breaking change. If you are running on GitHub hosted runners this will just work, if you are using self-hosted runners make sure, that your runners are up to date. If you followed the normal installation instructions your self-hosted runner will keep itself updated.</p>\n<p>This release also removes the deprecated input <code>server-url</code> which was used to download uv releases from a different server.\nThe <a href=\"https://github.com/astral-sh/setup-uv?tab=readme-ov-file#manifest-file\">manifest-file</a> input supersedes that functionality by adding a flexible way to define available versions and where they should be downloaded from.</p>\n<h3>Fixes</h3>\n<ul>\n<li>The action now respects when the environment variable <code>UV_CACHE_DIR</code> is already set and does not overwrite it. It now also finds <a href=\"https://docs.astral.sh/uv/reference/settings/#cache-dir\">cache-dir</a> settings in config files if you set them.</li>\n<li>Some users encountered problems that <a href=\"https://github.com/astral-sh/setup-uv?tab=readme-ov-file#disable-cache-pruning\">cache pruning</a> took forever because they had some <code>uv</code> processes running in the background. Starting with uv version <code>0.8.24</code> this action uses <code>uv cache prune --ci --force</code> to ignore the running processes</li>\n<li>If you just want to install uv but not have it available in path, this action now respects <code>UV_NO_MODIFY_PATH</code></li>\n<li>Some other actions also set the env var <code>UV_CACHE_DIR</code>. This action can now deal with that but as this could lead to unwanted behavior in some edgecases a warning is now displayed.</li>\n</ul>\n<h3>Improvements</h3>\n<p>If you are using minimum version specifiers for the version of uv to install for example</p>\n<pre lang=\"toml\"><code>[tool.uv]\nrequired-version = &quot;&gt;=0.8.17&quot;\n</code></pre>\n<p>This action now detects that and directly uses the latest version. Previously it would download all available releases from the uv repo\nto determine the highest matching candidate for the version specifier, which took much more time.</p>\n<p>If you are using other specifiers like <code>0.8.x</code> this action still needs to download all available releases because the specifier defines an upper bound (not 0.9.0 or later) and &quot;latest&quot; would possibly not satisfy that.</p>\n<h2>🚨 Breaking changes</h2>\n<ul>\n<li>Use node24 instead of node20 <a href=\"https://github.com/eifinger\"><code>@​eifinger</code></a> (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/608\">#608</a>)</li>\n<li>Remove deprecated input server-url <a href=\"https://github.com/eifinger\"><code>@​eifinger</code></a> (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/607\">#607</a>)</li>\n</ul>\n<h2>🐛 Bug fixes</h2>\n<ul>\n<li>Respect UV_CACHE_DIR and cache-dir <a href=\"https://github.com/eifinger\"><code>@​eifinger</code></a> (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/612\">#612</a>)</li>\n<li>Use --force when pruning cache <a href=\"https://github.com/eifinger\"><code>@​eifinger</code></a> (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/611\">#611</a>)</li>\n<li>Respect UV_NO_MODIFY_PATH <a href=\"https://github.com/eifinger\"><code>@​eifinger</code></a> (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/603\">#603</a>)</li>\n<li>Warn when <code>UV_CACHE_DIR</code> has changed <a href=\"https://github.com/jamesbraza\"><code>@​jamesbraza</code></a> (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/601\">#601</a>)</li>\n</ul>\n<h2>🚀 Enhancements</h2>\n<ul>\n<li>Shortcut to latest version for minimum version specifier <a href=\"https://github.com/eifinger\"><code>@​eifinger</code></a> (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/598\">#598</a>)</li>\n</ul>\n<h2>🧰 Maintenance</h2>\n<ul>\n<li>Bump dependencies <a href=\"https://github.com/eifinger\"><code>@​eifinger</code></a> (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/613\">#613</a>)</li>\n<li>Fix test-uv-no-modify-path <a href=\"https://github.com/eifinger\"><code>@​eifinger</code></a> (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/604\">#604</a>)</li>\n</ul>\n<!-- raw HTML omitted -->\n</blockquote>\n<p>... (truncated)</p>\n</details>\n<details>\n<summary>Commits</summary>\n<ul>\n<li><a href=\"https://github.com/astral-sh/setup-uv/commit/eb1897b8dc4b5d5bfe39a428a8f2304605e0983c\"><code>eb1897b</code></a> Bump dependencies (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/613\">#613</a>)</li>\n<li><a href=\"https://github.com/astral-sh/setup-uv/commit/d78d7918222df7ae64776e17698a33a649bd62b9\"><code>d78d791</code></a> Bump github/codeql-action from 3.30.5 to 3.30.6 (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/605\">#605</a>)</li>\n<li><a href=\"https://github.com/astral-sh/setup-uv/commit/535dc2664c7d0238c36003c2067a51ce94fa162b\"><code>535dc26</code></a> Respect UV_CACHE_DIR and cache-dir (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/612\">#612</a>)</li>\n<li><a href=\"https://github.com/astral-sh/setup-uv/commit/f610be5ff953261e92c39a6c253f445ec8cf3caf\"><code>f610be5</code></a> Use --force when pruning cache (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/611\">#611</a>)</li>\n<li><a href=\"https://github.com/astral-sh/setup-uv/commit/3deccc00754b93ea5d734f5c886a9a5d472ad595\"><code>3deccc0</code></a> Use node24 instead of node20 (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/608\">#608</a>)</li>\n<li><a href=\"https://github.com/astral-sh/setup-uv/commit/d9ee7e2f262885c8843e45732f53001dc76be009\"><code>d9ee7e2</code></a> Remove deprecated input server-url (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/607\">#607</a>)</li>\n<li><a href=\"https://github.com/astral-sh/setup-uv/commit/59a0868feaba544d51cc3fd89ba7c8a8bc9c6d05\"><code>59a0868</code></a> Bump github/codeql-action from 3.30.3 to 3.30.5 (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/594\">#594</a>)</li>\n<li><a href=\"https://github.com/astral-sh/setup-uv/commit/c95255616484b1f79991d1ae2ddc0f5a16d69509\"><code>c952556</code></a> Bump <code>@​renovatebot/pep440</code> from 4.2.0 to 4.2.1 (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/581\">#581</a>)</li>\n<li><a href=\"https://github.com/astral-sh/setup-uv/commit/51c3328db252c8bcb66ec788a0b8725cc06fbd21\"><code>51c3328</code></a> Fix test-uv-no-modify-path (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/604\">#604</a>)</li>\n<li><a href=\"https://github.com/astral-sh/setup-uv/commit/f2859da2136ea665156125d1df40f08c628ddf99\"><code>f2859da</code></a> Respect UV_NO_MODIFY_PATH (<a href=\"https://redirect.github.com/astral-sh/setup-uv/issues/603\">#603</a>)</li>\n<li>Additional commits viewable in <a href=\"https://github.com/astral-sh/setup-uv/compare/v6...v7\">compare view</a></li>\n</ul>\n</details>\n<br />\n\n\n[![Dependabot compatibility score](https://dependabot-badges.githubapp.com/badges/compatibility_score?dependency-name=astral-sh/setup-uv&package-manager=github_actions&previous-version=6&new-version=7)](https://docs.github.com/en/github/managing-security-vulnerabilities/about-dependabot-security-updates#about-compatibility-scores)\n\nDependabot will resolve any conflicts with this PR as long as you don't alter it yourself. You can also trigger a rebase manually by commenting `@dependabot rebase`.\n\n[//]: # (dependabot-automerge-start)\n[//]: # (dependabot-automerge-end)\n\n---\n\n<details>\n<summary>Dependabot commands and options</summary>\n<br />\n\nYou can trigger Dependabot actions by commenting on this PR:\n- `@dependabot rebase` will rebase this PR\n- `@dependabot recreate` will recreate this PR, overwriting any edits that have been made to it\n- `@dependabot merge` will merge this PR after your CI passes on it\n- `@dependabot squash and merge` will squash and merge this PR after your CI passes on it\n- `@dependabot cancel merge` will cancel a previously requested merge and block automerging\n- `@dependabot reopen` will reopen this PR if it is closed\n- `@dependabot close` will close this PR and stop Dependabot recreating it. You can achieve the same result by closing it manually\n- `@dependabot show <dependency name> ignore conditions` will show all of the ignore conditions of the specified dependency\n- `@dependabot ignore this major version` will close this PR and stop Dependabot creating any more for this major version (unless you reopen the PR or upgrade to it yourself)\n- `@dependabot ignore this minor version` will close this PR and stop Dependabot creating any more for this minor version (unless you reopen the PR or upgrade to it yourself)\n- `@dependabot ignore this dependency` will close this PR and stop Dependabot creating any more for this dependency (unless you reopen the PR or upgrade to it yourself)\n\n\n</details>",
+    "author": "dependabot[bot]",
+    "created_at": "2025-10-08T11:07:00+00:00",
+    "merged_at": "2025-10-08T14:36:25+00:00",
+    "url": "https://github.com/fastapi/fastapi/pull/14167",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "svlandeg",
+        "timestamp": "2025-10-08T14:36:06+00:00",
+        "content": "LGTM, and I double checked that we don't use the deprecated `server-url`.",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 14,
+      "loc_deleted": 14,
+      "num_files": 11,
+      "num_review_comments": 1,
+      "labels": [
+        "dependencies",
+        "github_actions",
+        "internal"
+      ]
+    }
+  },
+  {
+    "pr_id": "fastapi/fastapi#14036",
+    "repository": "fastapi/fastapi",
+    "pr_number": 14036,
+    "title": "👽️ Ensure compatibility with Pydantic 2.12.0",
+    "description": "`tests/test_multi_body_errors.py::test_openapi_schema` failed with pydantic 2.12.0a1 due to\r\nhttps://github.com/pydantic/pydantic/pull/11987.  Since we're testing the exact contents of the JSON schema, the easiest fix seems to be to add version-dependent handling for this.",
+    "author": "cjwatson",
+    "created_at": "2025-09-02T11:58:36+00:00",
+    "merged_at": "2025-10-08T08:57:37+00:00",
+    "url": "https://github.com/fastapi/fastapi/pull/14036",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "Viicos",
+        "timestamp": "2025-09-22T16:05:41+00:00",
+        "file": "fastapi/_compat.py",
+        "line_number": 0,
+        "content": "```suggestion\r\n                # Pydantic >= 2.12.0 warns about field specific metadata that is unused\r\n                # (e.g. `TypeAdapter(Annotated[int, Field(alias='b')])`). In some cases, we\r\n                # end up building the type adapter from a model field annotation so we\r\n                # need to ignore the warning:",
+        "type": "inline"
+      },
+      {
+        "reviewer": "Viicos",
+        "timestamp": "2025-09-22T16:07:36+00:00",
+        "file": "fastapi/_compat.py",
+        "line_number": 0,
+        "content": "- I believe you need to use the `catch_warnings` context manager, because as it stands the warning will always be ignored from now on.\r\n- I would suggest using an explicit version check on the `pydantic` version instead of a `try..except` statement, so that it can easily be unconditionally imported once FastAPI drops support for Pydantic < 2.12.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "Viicos",
+        "timestamp": "2025-09-22T16:07:49+00:00",
+        "file": "tests/test_multi_body_errors.py",
+        "line_number": 0,
+        "content": "```suggestion\r\n                                        # pydantic < 2.12.0\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "Viicos",
+        "timestamp": "2025-09-22T16:07:58+00:00",
+        "file": "tests/test_multi_body_errors.py",
+        "line_number": 0,
+        "content": "```suggestion\r\n                                        # pydantic >= 2.12.0\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "cjwatson",
+        "timestamp": "2025-09-25T11:49:02+00:00",
+        "file": "fastapi/_compat.py",
+        "line_number": 0,
+        "content": "I'm already using the `catch_warnings` context manager just above, so I'm confused about your first point.\r\n\r\nI've made your suggested second change.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "svlandeg",
+        "timestamp": "2025-10-07T10:04:18+00:00",
+        "file": "fastapi/_compat.py",
+        "line_number": 0,
+        "content": "Once Pydantic 2.12 is released, we'll be able to remove the `no cover` statement here.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "Viicos",
+        "timestamp": "2025-10-07T10:04:37+00:00",
+        "file": "fastapi/_compat.py",
+        "line_number": 0,
+        "content": "(Which should happen very soon, hopefully today).",
+        "type": "inline"
+      },
+      {
+        "reviewer": "Viicos",
+        "timestamp": "2025-10-07T10:04:56+00:00",
+        "file": "fastapi/_compat.py",
+        "line_number": 121,
+        "content": "This is still incorrect, as per my first point [here](https://github.com/fastapi/fastapi/pull/14036#discussion_r2369201471).",
+        "type": "inline"
+      },
+      {
+        "reviewer": "svlandeg",
+        "timestamp": "2025-10-07T10:14:55+00:00",
+        "file": "fastapi/_compat.py",
+        "line_number": 0,
+        "content": "(I know, but we have a bit of a chicken-or-egg situation going on here 😉)",
+        "type": "inline"
+      },
+      {
+        "reviewer": "Viicos",
+        "timestamp": "2025-10-07T10:19:31+00:00",
+        "file": "fastapi/_compat.py",
+        "line_number": 0,
+        "content": "Yeah no worries, just wanted to give you a release estimate!",
+        "type": "inline"
+      },
+      {
+        "reviewer": "svlandeg",
+        "timestamp": "2025-10-07T10:28:15+00:00",
+        "file": "fastapi/_compat.py",
+        "line_number": 121,
+        "content": "Hi @Viicos, thanks for the additional review! 🙏 \r\n\r\nCan you elaborate on your point?\r\n\r\nThe current code uses `warnings.simplefilter` within a `with warnings.catch_warnings()` context manager. It is my understanding that, once the context manager exits, after L128, the warnings filter is restored to its original state when the context was entered (L113) ?",
+        "type": "inline"
+      },
+      {
+        "reviewer": "Viicos",
+        "timestamp": "2025-10-07T10:34:50+00:00",
+        "file": "fastapi/_compat.py",
+        "line_number": 121,
+        "content": "My bad, I always get confused by this `warnings` API, as the context manager isn't opened right on top of the filter. All good!",
+        "type": "inline"
+      },
+      {
+        "reviewer": "svlandeg",
+        "timestamp": "2025-10-07T11:23:36+00:00",
+        "file": "fastapi/_compat.py",
+        "line_number": 121,
+        "content": "No worries, thanks for double checking! 🙏 ",
+        "type": "inline"
+      },
+      {
+        "reviewer": "svlandeg",
+        "timestamp": "2025-10-07T09:58:29+00:00",
+        "content": "Ok, just to recap and apologies for the earlier confusion!\r\n\r\nThis PR ensures compatibility with Pydantic 2.12.0, which will be released soon.\r\n\r\nIn particular, `pydantic` 2.12.0a1 causes 2 types of failures in our test suite:\r\n\r\n- `test_openapi_schema` fails due to https://github.com/pydantic/pydantic/pull/11987 as explained by OP. The test is adjusted to work on both new and older versions of Pydantic.\r\n- warnings about using the `alias` attribute with value `with` in the `Field()` function, cf PR https://github.com/pydantic/pydantic/pull/12028. This PR suppresses those warnings when creating type adapters in FastAPI, which seems like a reasonable solution to me.\r\n\r\nI had intended to merge these fixes as part of a larger PR to get ready for Python 3.14, but have reverted that and suggest we merge & release this separately to ensure compatibility with the upcoming Pydantic 2.12.0.\r\n\r\nThanks again for your work on this, @cjwatson !",
+        "state": "APPROVED",
+        "type": "general"
+      },
+      {
+        "reviewer": "tiangolo",
+        "timestamp": "2025-10-08T08:57:15+00:00",
+        "content": "Nice, thank you @cjwatson! 🚀 \n\nAnd thanks a lot for all the help here @YuriiMotov, @Viicos, @svlandeg, @patrick91 🙌 \n\nSo cool to come and see all the conversations already done, the code simplified to the minimum, all the context easy to get quickly. Great job, thank you all! 🍰 \n\nI'll release this in the next hours/minutes in FastAPI 0.118.1 🎉 ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 32,
+      "loc_deleted": 12,
+      "num_files": 3,
+      "num_review_comments": 15,
+      "labels": [
+        "upgrade"
+      ]
+    }
+  },
+  {
+    "pr_id": "fastapi/fastapi#14110",
+    "repository": "fastapi/fastapi",
+    "pr_number": 14110,
+    "title": "⬆️ Add support for Python 3.14",
+    "description": "Python 3.14.0 is supposed to be released on October 7th, 2 weeks from now.\r\n\r\nWe'll need to merge this PR with https://github.com/fastapi/fastapi/pull/14036\r\n\r\nNote: probably requires https://github.com/fastapi/sqlmodel/pull/1578 first",
+    "author": "svlandeg",
+    "created_at": "2025-09-24T13:37:11+00:00",
+    "merged_at": "2025-09-24T15:58:06+00:00",
+    "url": "https://github.com/fastapi/fastapi/pull/14110",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "svlandeg",
+        "timestamp": "2025-09-24T14:39:21+00:00",
+        "file": ".github/workflows/test.yml",
+        "line_number": 84,
+        "content": "This can be removed when a stable Pydantic 2.12 release is available.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "svlandeg",
+        "timestamp": "2025-09-24T14:39:36+00:00",
+        "file": ".github/workflows/test.yml",
+        "line_number": 73,
+        "content": "This can be removed when Python 3.14 is officially available.",
+        "type": "inline"
+      }
+    ],
+    "metadata": {
+      "loc_added": 10,
+      "loc_deleted": 1,
+      "num_files": 2,
+      "num_review_comments": 2,
+      "labels": [
+        "internal"
+      ]
+    }
+  },
+  {
+    "pr_id": "fastapi/fastapi#14125",
+    "repository": "fastapi/fastapi",
+    "pr_number": 14125,
+    "title": "🔨 Modify `mkdocs_hooks.py` to add `title` to page's metadata (remove permalinks in social cards)",
+    "description": "This is to fix permalinks being displayed on page preview card\r\n\r\nPreview: https://feb1ec73.fastapitiangolo.pages.dev/assets/images/social/tutorial/first-steps.png",
+    "author": "YuriiMotov",
+    "created_at": "2025-09-29T12:46:13+00:00",
+    "merged_at": "2025-09-30T04:06:57+00:00",
+    "url": "https://github.com/fastapi/fastapi/pull/14125",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "tiangolo",
+        "timestamp": "2025-09-30T04:06:33+00:00",
+        "content": "Excellent, thank you @YuriiMotov! 🙌 ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 10,
+      "loc_deleted": 0,
+      "num_files": 2,
+      "num_review_comments": 1,
+      "labels": [
+        "internal"
+      ]
+    }
+  },
+  {
+    "pr_id": "fastapi/fastapi#13917",
+    "repository": "fastapi/fastapi",
+    "pr_number": 13917,
+    "title": "📝 Update `tutorial/security/oauth2-jwt/` to use `pwdlib` with Argon2 instead of `passlib`",
+    "description": "### Reason for Change: Migrating to `pwdlib` and `Argon2` for Modern Password Management\r\n\r\nThis PR aims to modernize project's password hashing approach, transitioning from the aging `passlib`/`bcrypt` combination to a more contemporary and secure solution: `pwdlib` paired with the `Argon2` algorithm.\r\n\r\n**Key Motivations for this Change:**\r\n\r\n1.  **`passlib` & Python 3.13+ Compatibility Issue:**\r\n    * The `crypt` module, utilized by `passlib` for certain operations, is officially deprecated and slated for complete removal in Python 3.13 (as per [PEP 594](https://peps.python.org/pep-0594/)).\r\n    * As highlighted by the `pwdlib` documentation, `passlib` has not been actively maintained recently, raising questions about its long-term support. This implies `passlib` will become incompatible with future Python versions, potentially blocking upgrades or necessitating urgent alternatives.\r\n    * `pwdlib` was specifically created to address this gap, offering a modern, actively maintained tool for password hashing designed for the \"modern Python era.\"\r\n\r\n2.  **Industry Standard and `fastapi-users` Adoption:**\r\n    * The `fastapi-users` library, commonly used fo user management in FastAPI, has already adopted `pwdlib` and `Argon2` since version 13.0.0. This can be verified in their commit history (see [v13.0.0...master comparison](https://github.com/fastapi-users/fastapi-users/compare/v13.0.0...master)).\r\n    * Their decision directly stemmed from the `crypt` deprecation warning ([Issue #1325](https://github.com/fastapi-users/fastapi-users/issues/1325)), underscoring the broader community's recognition of this critical issue.\r\n\r\n3.  **`Argon2`'s Superiority Over `bcrypt`:**\r\n    * While `bcrypt` has long been a reliable choice, `Argon2` is now considered the most preferred password hashing algorithm, recommended by the [IETF](https://www.ietf.org/rfc/rfc9106.html) and winner of the [Password Hashing Competition](https://www.password-hashing.net/).\r\n    * **GPU Attack Resistance (Memory Hardness):** `Argon2` is designed to be memory-hard, requiring significant amounts of memory, which makes it particularly resistant to GPU-based brute-force attacks that are becoming increasingly common. `bcrypt` is less resilient in this regard as it primarily relies on computational complexity.\r\n    * **Configurability:** `Argon2` offers more flexible parameters (time, memory, parallelism), allowing for better adaptation to specific security requirements and hardware capabilities.\r\n    * **Proven Security:** `Argon2` has undergone extensive cryptographic analysis and is widely regarded as a robust choice for password protection.\r\n    * For more information on the benefits of `Argon2`, please refer to:\r\n        * [OWASP Cheat Sheet Series: Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) (see \"Hashing Algorithms\" section)\r\n        * [Wikipedia: Argon2](https://en.wikipedia.org/wiki/Argon2)",
+    "author": "Neizvestnyj",
+    "created_at": "2025-07-23T13:59:21+00:00",
+    "merged_at": "2025-09-29T02:57:38+00:00",
+    "url": "https://github.com/fastapi/fastapi/pull/13917",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "tiangolo",
+        "timestamp": "2025-09-29T02:56:20+00:00",
+        "content": "Awesome, thank you! 🚀 🎉 \n\n---\n\nI removed the Russian translation so we can do that later in another PR.\n\nWe'll do it later on our end (@YuriiMotov will do it as part of a bigger translation system upgrade). 😎 ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 75,
+      "loc_deleted": 77,
+      "num_files": 15,
+      "num_review_comments": 1,
+      "labels": [
+        "docs"
+      ]
+    }
+  },
+  {
+    "pr_id": "fastapi/fastapi#11194",
+    "repository": "fastapi/fastapi",
+    "pr_number": 11194,
+    "title": "🐛 Fix validation error when `File` is declared after `Form` parameter",
+    "description": "This PR updates the fix (6185a92) from @jsg921019 so that tests pass with the latest FastAPI code (0.110.0).\r\nIt also adds a test to cover the case with multiple files, and another to ensure the order of parameters in an endpoint definition does not affect the way FastAPI handles the request.\r\n\r\n**Problem**\r\nWhen declaring an endpoint which accepts a `File` but also a `Form` parameter, the `File` parameter must be declared first or the endpoint would respond with error 422.\r\n\r\n**Context**\r\n- See discussion #9116\r\n- And probably also #4625\r\n",
+    "author": "thomasleveil",
+    "created_at": "2024-02-25T15:07:29+00:00",
+    "merged_at": "2025-09-20T19:55:59+00:00",
+    "url": "https://github.com/fastapi/fastapi/pull/11194",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "YuriiMotov",
+        "timestamp": "2024-02-25T15:35:49+00:00",
+        "file": "tests/test_request_form_multiple_files.py",
+        "line_number": 0,
+        "content": "```suggestion\r\nfrom typing_extensions import Annotated\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "YuriiMotov",
+        "timestamp": "2024-02-25T15:36:50+00:00",
+        "file": "tests/test_request_form_file.py",
+        "line_number": 0,
+        "content": "```suggestion\r\nfrom typing_extensions import Annotated\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "YuriiMotov",
+        "timestamp": "2024-02-25T15:46:53+00:00",
+        "file": "tests/test_request_form_file.py",
+        "line_number": 0,
+        "content": "```suggestion\r\nbody_create_file_files__post = {\r\n    \"title\": \"Body_create_file_files__post\",\r\n    \"required\": [\"token\", \"file\"],\r\n    \"type\": \"object\",\r\n    \"properties\": {\r\n        \"token\": {\"title\": \"Token\", \"type\": \"string\"},\r\n        \"file\": {\"title\": \"File\", \"type\": \"string\", \"format\": \"binary\"},\r\n    },\r\n}\r\n\r\n\r\ndef test_openapi_schema():\r\n    response = client.get(\"/openapi.json\")\r\n    assert response.status_code == 200, response.text\r\n    json_response = response.json()\r\n    assert (\r\n        json_response[\"components\"][\"schemas\"][\"Body_create_file_files__post\"]\r\n        == body_create_file_files__post\r\n    )\r\n```\r\nWe can make it more readable",
+        "type": "inline"
+      },
+      {
+        "reviewer": "YuriiMotov",
+        "timestamp": "2024-02-25T15:48:23+00:00",
+        "content": "Nothing critical (except import from typing).\r\n\r\nI think it would be better to put all these related tests into one file and get rid of some of them (like `test_post_form_no_file` (and so on) for multiple files)",
+        "state": "CHANGES_REQUESTED",
+        "type": "general"
+      },
+      {
+        "reviewer": "YuriiMotov",
+        "timestamp": "2024-02-25T16:17:39+00:00",
+        "content": "The solution works.\r\nTests cover the issue. Tests fail before changes and pass after",
+        "state": "APPROVED",
+        "type": "general"
+      },
+      {
+        "reviewer": "tiangolo",
+        "timestamp": "2025-09-20T19:55:45+00:00",
+        "content": "Great, thank you! 🚀 🙌 ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 93,
+      "loc_deleted": 4,
+      "num_files": 2,
+      "num_review_comments": 6,
+      "labels": [
+        "bug",
+        "p2"
+      ]
+    }
+  },
+  {
+    "pr_id": "fastapi/fastapi#14059",
+    "repository": "fastapi/fastapi",
+    "pr_number": 14059,
+    "title": "📝 Remove outdated formatting from `path-params-numeric-validations.md` for languages `en`, `es` and `uk`.",
+    "description": "This was a leftover after the docs reformatting in https://github.com/fastapi/fastapi/pull/12825",
+    "author": "svlandeg",
+    "created_at": "2025-09-10T09:52:04+00:00",
+    "merged_at": "2025-09-20T16:27:22+00:00",
+    "url": "https://github.com/fastapi/fastapi/pull/14059",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "YuriiMotov",
+        "timestamp": "2025-09-10T14:47:48+00:00",
+        "content": "LGTM\r\n\r\nWe don't have the annotated version for this code example, so, this tip is not needed",
+        "state": "APPROVED",
+        "type": "general"
+      },
+      {
+        "reviewer": "tiangolo",
+        "timestamp": "2025-09-20T16:27:11+00:00",
+        "content": "Nice, thank you! ☕ ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 0,
+      "loc_deleted": 30,
+      "num_files": 3,
+      "num_review_comments": 2,
+      "labels": [
+        "docs"
+      ]
+    }
+  },
+  {
+    "pr_id": "django/django#19707",
+    "repository": "django/django",
+    "pr_number": 19707,
+    "title": "Converted all relative imports to in-package absolute ones in ./django.",
+    "description": "#### Trac ticket number\r\nN/A\r\n\r\n#### Branch description\r\nReplaced all relative imports (e.g., `from ..utils import ...`) with in-package absolute imports (e.g., `from django.contrib.postgres.utils import ...`) across the codebase in **./django**.\r\n\r\n> Use absolute imports for other Django components and relative imports for local components.\r\n> https://docs.djangoproject.com/en/dev/internals/contributing/writing-code/coding-style/#imports\r\n\r\nFYI: used my own pre-commit-hook [shrimport](https://github.com/lyova24/shrimport)\r\n\r\n#### Checklist\r\n- [x] This PR targets the `main` branch. <!-- Backports will be evaluated and done by mergers, when necessary. -->\r\n- [x] The commit message is written in past tense, mentions the ticket number, and ends with a period.\r\n- [ ] I have checked the \"Has patch\" ticket flag in the Trac system.\r\n- [ ] I have added or updated relevant tests.\r\n- [x] I have added or updated relevant docs, including release notes if applicable.\r\n- [ ] I have attached screenshots in both light and dark modes for any UI changes.\r\n",
+    "author": "lyova24",
+    "created_at": "2025-08-05T11:15:54+00:00",
+    "merged_at": "2025-10-13T21:27:07+00:00",
+    "url": "https://github.com/django/django/pull/19707",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-10-13T19:42:43+00:00",
+        "content": "Thanks @lyova24 👍 ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 15,
+      "loc_deleted": 18,
+      "num_files": 10,
+      "num_review_comments": 1,
+      "labels": [
+        "no ticket"
+      ]
+    }
+  },
+  {
+    "pr_id": "django/django#19952",
+    "repository": "django/django",
+    "pr_number": 19952,
+    "title": "Added notes about automatic roadmap generation for next version in docs/internals/howto-release-django.txt.",
+    "description": "This is a follow up of work done in https://github.com/django/djangoproject.com/pull/2233.",
+    "author": "nessita",
+    "created_at": "2025-10-13T16:42:02+00:00",
+    "merged_at": "2025-10-13T20:41:30+00:00",
+    "url": "https://github.com/django/django/pull/19952",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-10-13T18:36:55+00:00",
+        "file": "docs/internals/howto-release-django.txt",
+        "line_number": 0,
+        "content": "```suggestion\n   dates per the agreed schedule, and set the LTS flag if applicable. The\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-10-13T18:37:07+00:00",
+        "file": "docs/internals/howto-release-django.txt",
+        "line_number": 0,
+        "content": "```suggestion\n   ``X.Y`` roadmap page will be available at ``/download/X.Y/roadmap/``.\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-10-13T18:43:21+00:00",
+        "file": "docs/internals/howto-release-django.txt",
+        "line_number": 0,
+        "content": "Most of this section uses the 5.2 freeze as an example, would be nice to avoid jumping to another example.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-10-13T18:48:06+00:00",
+        "file": "docs/internals/howto-release-django.txt",
+        "line_number": 0,
+        "content": "Applying, thanks!",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-10-13T18:48:27+00:00",
+        "file": "docs/internals/howto-release-django.txt",
+        "line_number": 0,
+        "content": "Good point, will do that, thanks!",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-10-13T18:43:30+00:00",
+        "content": "Great, just some teeny copyedits to consider.",
+        "state": "COMMENTED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 9,
+      "loc_deleted": 11,
+      "num_files": 1,
+      "num_review_comments": 6,
+      "labels": [
+        "no ticket"
+      ]
+    }
+  },
+  {
+    "pr_id": "django/django#18892",
+    "repository": "django/django",
+    "pr_number": 18892,
+    "title": "Fixed #35961 -- Conformed license metadata to PEP 639 specification.",
+    "description": "#### Trac ticket number\r\n<!-- Replace XXXXX with the corresponding Trac ticket number, or delete the line and write \"N/A\" if this is a trivial PR. -->\r\n\r\nticket-35961\r\n\r\n#### Branch description\r\nProvide a concise overview of the issue or rationale behind the proposed changes.\r\n\r\n#### Checklist\r\n- [x] This PR targets the `main` branch. <!-- Backports will be evaluated and done by mergers, when necessary. -->\r\n- [x] The commit message is written in past tense, mentions the ticket number, and ends with a period.\r\n- [x] I have checked the \"Has patch\" ticket flag in the Trac system.\r\n- [ ] I have added or updated relevant tests. _I think there are no tests to be relevant_\r\n- [ ] I have added or updated relevant docs, including release notes if applicable. _I think this does not warrant a release note?_\r\n- [ ] I have attached screenshots in both light and dark modes for any UI changes. _N/A_\r\n",
+    "author": "mbeijen",
+    "created_at": "2024-12-06T19:56:24+00:00",
+    "merged_at": "2025-10-08T19:40:02+00:00",
+    "url": "https://github.com/django/django/pull/18892",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-09-04T20:39:16+00:00",
+        "file": "docs/intro/reusable-apps.txt",
+        "line_number": 211,
+        "content": "Source: https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license-and-license-files",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-09-04T20:49:19+00:00",
+        "file": "pyproject.toml",
+        "line_number": 2,
+        "content": "This will mean that an editable install with `-e` will not work on Python 3.8 on the 4.2 branch, but PyPI is forcing our hand; we need to be able to upload to PyPI after February 2026, and I don't think we should switch build tools altogether.\r\n\r\nPerhaps we can wait to backport this to 4.2 until we truly need it, e.g if there are further releases of 4.2.x in the six weeks after the PyPI deadline of 2026-Feb-18 before 4.2 goes EOL.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "sarahboyce",
+        "timestamp": "2025-09-23T15:20:53+00:00",
+        "file": "pyproject.toml",
+        "line_number": 2,
+        "content": "> an editable install with -e will not work on Python 3.8 on the 4.2 branch\r\n\r\nI personally think this is something we can live with",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-10-08T17:55:33+00:00",
+        "file": "docs/internals/contributing/writing-code/unit-tests.txt",
+        "line_number": 328,
+        "content": "What's the reasoning behind this change? Feels unrelated? cc/ @jacobtylerwalls ",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-10-08T18:08:59+00:00",
+        "file": "docs/internals/contributing/writing-code/unit-tests.txt",
+        "line_number": 328,
+        "content": "I'll remove since even if correct (unclear) it feels it needs a separated commit.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-10-13T18:22:41+00:00",
+        "file": "docs/internals/contributing/writing-code/unit-tests.txt",
+        "line_number": 328,
+        "content": "Good call, this didn't belong in this PR. I'll propose separately.\r\n",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2024-12-27T15:31:01+00:00",
+        "content": "Hello @mbeijen, thank you for your work on this!\r\n\r\nAs you can see in the CI failures, the proposed changes break the building of the Django package. Even locally, a run of `python -m build` fails with:\r\n\r\n```\r\nValueError: invalid pyproject.toml config: `project.license`.\r\nconfiguration error: `project.license` must be valid exactly by one definition (2 matches found):\r\n\r\n    - keys:\r\n        'file': {type: string}\r\n      required: ['file']\r\n    - keys:\r\n        'text': {type: string}\r\n      required: ['text']\r\n\r\n\r\nERROR Backend subprocess exited when trying to invoke get_requires_for_build_sdist\r\n```",
+        "state": "CHANGES_REQUESTED",
+        "type": "general"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-09-04T20:40:34+00:00",
+        "content": "Thanks @mbeijen! Just needed to increase the version of setuptools.\r\n\r\n@nessita up for a last look?",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 5,
+      "loc_deleted": 5,
+      "num_files": 2,
+      "num_review_comments": 8,
+      "labels": []
+    }
+  },
+  {
+    "pr_id": "django/django#19884",
+    "repository": "django/django",
+    "pr_number": 19884,
+    "title": "Fixed #36611, Refs #36580 -- Added system check for multicolumn ForeignObjects in Meta.indexes/constraints/unique_together.",
+    "description": "#### Trac ticket number\r\n<!-- Replace XXXXX with the corresponding Trac ticket number, or delete the line and write \"N/A\" if this is a trivial PR. -->\r\n\r\nticket-36611\r\n\r\n#### Branch description\r\n\r\nNote that reverting 8c621e96422e037c3997c8c9515bc050620852f6 entirely is also an option and means that I have less of a \"hacky\" test setup to keep those tests passing\r\n\r\nI am not 100% sure whether backporting a system check is allowed. I think we could do it in this case because:\r\n- ForeignObject's were never a documented feature and this feature isn't really working for them\r\n- I feel the reason this was raised was due to testing of other tickets rather than from use in the wild\r\n",
+    "author": "sarahboyce",
+    "created_at": "2025-09-19T14:32:21+00:00",
+    "merged_at": "2025-10-13T17:53:39+00:00",
+    "url": "https://github.com/django/django/pull/19884",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-09-19T14:47:19+00:00",
+        "file": "django/db/models/base.py",
+        "line_number": 0,
+        "content": "If we want to make this more resilient against subclassing, we could borrow the logic here:\r\n\r\nhttps://github.com/django/django/blob/7528979153355faa49c3e49ba3ea233f998a7583/django/db/models/base.py#L1379-L1382",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-09-19T14:47:31+00:00",
+        "file": "django/db/models/base.py",
+        "line_number": 0,
+        "content": "```suggestion\r\n                            f\"but ForeignObjects are not permitted in {option!r}.\",\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-09-19T14:54:08+00:00",
+        "file": "tests/foreign_object/tests.py",
+        "line_number": 0,
+        "content": "I bet we could move these to `invalid_models_tests.test_models.ConstraintsTests` to avoid the hack, but I didn't look too closely.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-09-25T18:48:04+00:00",
+        "file": "tests/foreign_object/tests.py",
+        "line_number": 0,
+        "content": "Looking again, that doesn't look very promising :-)",
+        "type": "inline"
+      },
+      {
+        "reviewer": "charettes",
+        "timestamp": "2025-09-25T18:49:42+00:00",
+        "file": "tests/foreign_object/tests.py",
+        "line_number": 0,
+        "content": "yeah you want to avoid altering model definition at run time like this it's doomed to cause a ton of problems.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "sarahboyce",
+        "timestamp": "2025-09-26T07:22:50+00:00",
+        "file": "docs/releases/6.0.txt",
+        "line_number": 0,
+        "content": "I think if we think this change needs a release note, we should move it to 6.1.\r\nThe contents of the 6.0 release should be frozen, so the release notes stay largely the same except for clarifications",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-09-26T12:57:27+00:00",
+        "file": "docs/releases/6.0.txt",
+        "line_number": 0,
+        "content": "Thanks for mentioning. My thinking here was that we backport bugfixes to 6.0 during the alpha. We're fixing a bug by adding a system check. (We even first considered backporting the system check all the way to 5.2.) Sometimes bugfixes have minor incompatible changes we document. But system checks go in the \"feature\" section. So I think we have some play in the joints here to do whatever we feel is right. We can move this to the minor incompatible changes section. I guess I'm reluctant to avoid documenting something just because it doesn't fit cleanly into our rules of thumb.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "sarahboyce",
+        "timestamp": "2025-09-26T14:00:05+00:00",
+        "file": "docs/releases/6.0.txt",
+        "line_number": 0,
+        "content": "I'm not sure we usually add a release note for new system checks (e.g. 6888375c53476011754f778deabc6cdbfa327011 f82c67aa217c8dd4320ef697b04a6da1681aa799 4c4536f7442a3ed1218f5b1dc791295d65c24f4c d1855c4847215f3afe3708736be13388bb6437eb)",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-09-26T14:50:01+00:00",
+        "file": "docs/releases/6.0.txt",
+        "line_number": 0,
+        "content": "Good point. Those examples look like straightforward error conditions. Here we have a judgment call about whether this system check is going beyond error conditions to also \"taking away\" functionality that was sort-of working:\r\n\r\nUsing `ForeignObject` in a constraint is just \"sugar\" as pointed out [here](https://code.djangoproject.com/ticket/36611#comment:8), since you can just specify the from fields they resolve to instead. The sugar mostly works for defining the constraint[0]. ticket-36611 was about the validation layer (`full_clean()` etc) not working for n>1 columns. So we're \"taking away\" functionality that worked for 1) n=1 columns or 2) projects that don't use full_clean, e.g. DRF projects. But not taking away anything particularly important, since it can be easily replaced.\r\n\r\n@sarahboyce points out if we think this isn't documentable, we can more easily backport, but is concerned about backporting a documentable minor-incompatible-change into 6.0 during the alpha. This is a private API, but we've doc'd changes before, including with a deprecation path: 8b1ff0d.\r\n\r\nPaging @nessita as 6.0 release manager for a call about whether to document and/or backport.\r\n\r\n***\r\n[0] we're still finding edge cases, which is why Simon cautioned [here](https://code.djangoproject.com/ticket/36611#comment:8) to pause further work.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-09-29T17:30:15+00:00",
+        "file": "docs/releases/6.0.txt",
+        "line_number": 0,
+        "content": "I've gone into the ticket history, code, and deep git log inspection, and I think we could merge this without release notes and backport to 6.0.x since there's a similar precedent in c705625ebff0141ed2b95dd3c8174bda8270a47f. This commits add a new system check error and a new warning after the alpha (arguably the commit fixes a release blocker).\r\n\r\nHaving said that, I would very much prefer that the system check error is **only** raised when the inspected constraint involves multiple columns. Single column `ForeignObject` constraints do work in practice, and blocking them entirely breaks existing valid (ish but likely in the wild) code. Supporting those cases aligns with Jacob's point about not removing functionality projects may be relying on, while still warning users off multi-column usage that is definitively broken.\r\n\r\n@charettes I'm keen to your view on the above.\r\n\r\n(I'll follow up with a diff suggestion containing the concrete code change.)",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-09-29T17:31:47+00:00",
+        "file": "django/db/models/base.py",
+        "line_number": 2227,
+        "content": "How about we narrow this down to:\r\n```suggestion\r\n                    and len(getattr(field, \"from_fields\", [])) > 1\r\n                ):\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-09-29T17:32:26+00:00",
+        "file": "django/db/models/base.py",
+        "line_number": 0,
+        "content": "With message:\r\n```suggestion\r\n                            f\"{option!r} refers to a ForeignObject {field_name!r} \"\r\n                            f\"with multiple target fields, which is not supported.\",\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-09-29T18:03:52+00:00",
+        "file": "tests/invalid_models_tests/test_models.py",
+        "line_number": 216,
+        "content": "```suggestion\r\n        self.assertEqual(ReferenceTab.check(), [])\r\n\r\n    def test_pointing_to_foreign_object_multi_column(self):\r\n        class Reference(models.Model):\r\n            reference_id = models.IntegerField(unique=True)\r\n            code = models.CharField(max_length=1)\r\n\r\n        class ReferenceTabMultiple(models.Model):\r\n            reference_id = models.IntegerField()\r\n            code = models.CharField(max_length=1)\r\n            reference = models.ForeignObject(\r\n                Reference,\r\n                from_fields=[\"reference_id\", \"code\"],\r\n                to_fields=[\"reference_id\", \"code\"],\r\n                on_delete=models.CASCADE,\r\n            )\r\n\r\n            class Meta:\r\n                unique_together = [[\"reference\"]]\r\n\r\n        self.assertEqual(\r\n            ReferenceTabMultiple.check(),\r\n            [\r\n                Error(\r\n                    \"'unique_together' refers to a ForeignObject 'reference' \"\r\n                    \"with multiple target fields, which is not supported.\",\r\n                    obj=ReferenceTabMultiple,\r\n                    id=\"models.E049\",\r\n                ),\r\n            ],\r\n        )\r\n\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-10-04T01:04:58+00:00",
+        "file": "docs/ref/checks.txt",
+        "line_number": 0,
+        "content": "This message in the docs needs to match exactly what we print as the actual error. I believe \"for that option\" is here but not in the error appending code.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-10-04T01:06:06+00:00",
+        "file": "tests/foreign_object/tests.py",
+        "line_number": 0,
+        "content": "I haven't fully understood why we need to move this class to inside the `setUpClass`  forcing us to do `self.CustomerTab` in the tests. Could you help me understand please?",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-10-04T01:13:05+00:00",
+        "file": "tests/foreign_object/tests.py",
+        "line_number": 0,
+        "content": "Oh! Now that we've adjusted the system check to affect only multicolumns, we could probably revert this change.\r\n\r\n(It was only moved up here to evade the system check, so we could still check the underlying code supporting n = 1 columns.)",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-09-19T14:54:20+00:00",
+        "content": "Thanks Sarah. 🙏 \r\n\r\nHeads up I think you meant to reference a different commit in the PR description.",
+        "state": "COMMENTED",
+        "type": "general"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-09-29T18:04:20+00:00",
+        "content": "Commented with my opinion following the ping (thank you for including me!)",
+        "state": "COMMENTED",
+        "type": "general"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-10-04T01:06:23+00:00",
+        "content": "Thank you Jacob and others! 🌟 ",
+        "state": "COMMENTED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 69,
+      "loc_deleted": 0,
+      "num_files": 4,
+      "num_review_comments": 19,
+      "labels": []
+    }
+  },
+  {
+    "pr_id": "django/django#19945",
+    "repository": "django/django",
+    "pr_number": 19945,
+    "title": "Fixed #36660 -- Fixed a regression in descending Index local field checks.",
+    "description": "#### Trac ticket number\r\n<!-- Replace XXXXX with the corresponding Trac ticket number, or delete the line and write \"N/A\" if this is a trivial PR. -->\r\n\r\nticket-36660\r\n\r\n#### Branch description\r\n\r\nRegression in 8638d8bf74c1a58302c97d4436ad2eb08438145b.\r\n\r\nRefs ticket-36273.\r\n\r\nThanks @federicobond for the report.\r\n",
+    "author": "charettes",
+    "created_at": "2025-10-12T17:00:10+00:00",
+    "merged_at": "2025-10-13T13:42:23+00:00",
+    "url": "https://github.com/django/django/pull/19945",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "timgraham",
+        "timestamp": "2025-10-12T23:27:53+00:00",
+        "file": "tests/invalid_models_tests/test_models.py",
+        "line_number": 0,
+        "content": "single line?",
+        "type": "inline"
+      }
+    ],
+    "metadata": {
+      "loc_added": 15,
+      "loc_deleted": 1,
+      "num_files": 2,
+      "num_review_comments": 1,
+      "labels": []
+    }
+  },
+  {
+    "pr_id": "django/django#19792",
+    "repository": "django/django",
+    "pr_number": 19792,
+    "title": "Fixed #36526 -- Doc'd QuerySet.bulk_update() memory usage when batching.",
+    "description": "#### Trac ticket number\r\n<!-- Replace XXXXX with the corresponding Trac ticket number, or delete the line and write \"N/A\" if this is a trivial PR. -->\r\n\r\nticket-36526\r\n\r\n#### Branch description\r\nTangential follow up to 52aa26e6979ba81b00f1593d5ee8c5c73aaa6391.\r\n\r\n#### Checklist\r\n- [X] This PR targets the `main` branch. <!-- Backports will be evaluated and done by mergers, when necessary. -->\r\n- [X] The commit message is written in past tense, mentions the ticket number, and ends with a period.\r\n- [X] I have checked the \"Has patch\" ticket flag in the Trac system.\r\n- [X] I have added or updated relevant docs, including release notes if applicable.\r\n",
+    "author": "nessita",
+    "created_at": "2025-08-28T20:21:30+00:00",
+    "merged_at": "2025-10-08T21:27:16+00:00",
+    "url": "https://github.com/django/django/pull/19792",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "charettes",
+        "timestamp": "2025-08-28T21:07:16+00:00",
+        "file": "docs/ref/models/querysets.txt",
+        "line_number": 0,
+        "content": "I do understand that it's a succinct way of getting model instances for the stake of the example but this slightly bugs me as this means we'll perform 1000 queries 😅 \r\n\r\nWhat about \r\n```suggestion\r\n    ids_iter = range(1000)\r\n    while ids := list(islice(ids_iter, batch_size)):\r\n        batch = Entry.objects.filter(ids__in=ids)\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-10-08T19:51:23+00:00",
+        "file": "docs/ref/models/querysets.txt",
+        "line_number": 0,
+        "content": "Finally updated! Will merge when CI is green.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "charettes",
+        "timestamp": "2025-08-28T21:26:38+00:00",
+        "content": "Thanks for putting this together @nessita 🙇 ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 15,
+      "loc_deleted": 0,
+      "num_files": 1,
+      "num_review_comments": 3,
+      "labels": []
+    }
+  },
+  {
+    "pr_id": "django/django#19916",
+    "repository": "django/django",
+    "pr_number": 19916,
+    "title": "Fixed #36623 -- Dropped support for PostgreSQL 14 and PostGIS 3.1.",
+    "description": "ticket-36623",
+    "author": "felixxm",
+    "created_at": "2025-10-03T11:24:28+00:00",
+    "merged_at": "2025-10-03T21:12:58+00:00",
+    "url": "https://github.com/django/django/pull/19916",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-10-03T21:09:30+00:00",
+        "content": "Looks great.",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 32,
+      "loc_deleted": 30,
+      "num_files": 13,
+      "num_review_comments": 1,
+      "labels": []
+    }
+  },
+  {
+    "pr_id": "django/django#19057",
+    "repository": "django/django",
+    "pr_number": 19057,
+    "title": "Fixed #35972 -- Fixed lookup crashes after subquery annotations.",
+    "description": "#### Trac ticket number\r\nticket-35972\r\n\r\n#### Branch description\r\nStandardize on tuples rather than lists for params to improve interoperability of ORM expressions.\r\n\r\nPreviously, some queries failed with `TypeError` when combined with `Subquery`:\r\n  - the `__regex` lookup on mariadb (and likely MySQL)\r\n  - the documented [example](https://docs.djangoproject.com/en/5.2/howto/custom-lookups/#a-lookup-example) for custom lookup expressions\r\n\r\n#### Checklist\r\n- [x] This PR targets the `main` branch. <!-- Backports will be evaluated and done by mergers, when necessary. -->\r\n- [x] The commit message is written in past tense, mentions the ticket number, and ends with a period.\r\n- [x] I have checked the \"Has patch\" ticket flag in the Trac system.\r\n- [x] I have added or updated relevant tests.\r\n- [x] I have added or updated relevant docs, including release notes if applicable.\r\n- [x] I have attached screenshots in both light and dark modes for any UI changes.\r\n",
+    "author": "jacobtylerwalls",
+    "created_at": "2025-01-16T13:28:55+00:00",
+    "merged_at": "2025-08-04T08:14:01+00:00",
+    "url": "https://github.com/django/django/pull/19057",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "sarahboyce",
+        "timestamp": "2025-02-07T15:55:44+00:00",
+        "file": "tests/custom_lookups/tests.py",
+        "line_number": 253,
+        "content": "I like that `NotEqual` is now in our test suite, I checked the documented custom `AbsoluteValueLessThan` lookup that's in the docs and this also appears to be working :+1: ",
+        "type": "inline"
+      },
+      {
+        "reviewer": "sarahboyce",
+        "timestamp": "2025-02-07T16:07:08+00:00",
+        "file": "tests/lookup/tests.py",
+        "line_number": 0,
+        "content": "How do you feel about having a test which covers pretty much all registered lookups with a subquery (in a loop with `self.subTest`)?\r\nThere's a couple of line changes which we haven't strictly covered with a test and I wonder if having something like this might \"catch\" this issue in future lookups :thinking: \r\n",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-02-09T01:00:25+00:00",
+        "file": "tests/lookup/tests.py",
+        "line_number": 0,
+        "content": "Good idea. (Note to self: probably move this test to BasicExpressionsTests circa `test_in_subquery()`?)\r\n\r\nCould you let me know which line changes you don't see covered? I tried reverting each one individually (while leaving the rest of the PR) and at least one test failed for each, but I might be missing your meaning:\r\n\r\n| change | test |\r\n| ------------- | ------------- |\r\n| Col.as_sql | test_custom_implementation_year_exact |\r\n| HasKeyLookup.as_sql | queries.test_bulk_update.BulkUpdateTests.test_json_field |\r\n| Lookup.get_db_prep_lookup | custom_lookups.tests.LookupTests.test_custom_lookup_with_subquery |\r\n| IExact.process_rhs | admin_utils.test_logentry.LogEntryTests.test_logentry_change_message |\r\n| PatternLookup.process_rhs | model_forms.test_modelchoicefield.ModelChoiceFieldTests.test_queryset_none |\r\n| Regex.get_db_prep_lookup | (on mariadb:) lookups.tests.LookupTests.test_regex_lookup_with_subquery |\r\n| SearchVector.as_sql | (on postgres) postgres_tests.test_search.MultipleFieldsTest |\r\n| SearchVectorExact.as_sql |  (on postgres) postgres_tests.test_search.TestCombinations |\r\n| DistanceLookupFromFunction.as_sql | gis_tests.distapp.tests.DistanceTest |\r\n| DWithinLookup.process_rhs | gis_tests.distapp.tests.DistanceTest |\r\n| RelateLookup.process_rhs |  gis_tests.distapp.tests.DistanceTest |\r\n",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-02-09T23:59:00+00:00",
+        "file": "tests/expressions/tests.py",
+        "line_number": 752,
+        "content": "I looked into doing something similar for JSONField, but it fails pretty badly, so this might be a follow-up ticket:\r\n\r\nRough test:\r\n```diff\r\ndiff --git a/tests/model_fields/test_jsonfield.py b/tests/model_fields/test_jsonfield.py\r\nindex 5a9cf9ad7a..32471d910e 100644\r\n--- a/tests/model_fields/test_jsonfield.py\r\n+++ b/tests/model_fields/test_jsonfield.py\r\n@@ -925,6 +925,20 @@ class TestQuerying(TestCase):\r\n             self.objs[3:5],\r\n         )\r\n \r\n+    @skipUnlessDBFeature(\"supports_json_field_contains\")\r\n+    def test_lookups_subquery(self):\r\n+        qs = NullableJSONModel.objects.values(\"value__foo\")[:1]\r\n+        for lookup in JSONField.get_lookups():\r\n+            with self.subTest(lookup=lookup):\r\n+                if lookup == \"isnull\":\r\n+                    continue  # not allowed, rhs must be a literal boolean.\r\n+                if lookup in {\"has_keys\", \"has_any_keys\"}:\r\n+                    rhs = [Subquery(qs)]\r\n+                else:\r\n+                    rhs = Subquery(qs)\r\n+                qs = NullableJSONModel.objects.filter(**{f\"value__foo__{lookup}\": rhs})\r\n+                self.assertGreaterEqual(len(qs), 0)\r\n+\r\n     @skipUnlessDBFeature(\"supports_json_field_contains\")\r\n     def test_array_key_contains(self):\r\n         tests = [\r\n```\r\n***\r\n```\r\n  File \"/usr/local/lib/python3.12/site-packages/psycopg/cursor.py\", line 97, in execute\r\n    raise ex.with_traceback(None)\r\ndjango.db.utils.ProgrammingError: the query has 5 placeholders but 19 parameters were passed\r\n```\r\n",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-02-10T15:23:01+00:00",
+        "file": "docs/releases/6.0.txt",
+        "line_number": 442,
+        "content": "By pointing this out I'm kind of detracting from the point @sarahboyce made above that we didn't strictly need to adjust the example for doing `lhs_params + rhs_params`, but during the transition period I think it's helpful to point out that doing so is not the best idea. But I can also see how this is \"documenting a bug\". Thoughts?",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-02-10T15:27:19+00:00",
+        "file": "docs/releases/6.0.txt",
+        "line_number": 0,
+        "content": "Interestingly, django-stubs had this typed as list [only](https://github.com/typeddjango/django-stubs/blob/bda19560285a2b608bcf193f49e11530dc58ff7f/django-stubs/db/models/sql/compiler.pyi#L18).",
+        "type": "inline"
+      },
+      {
+        "reviewer": "browniebroke",
+        "timestamp": "2025-04-26T15:56:14+00:00",
+        "file": "tests/custom_lookups/tests.py",
+        "line_number": 262,
+        "content": "Did you use the `a + b` style over the `(*a, *b)` intentionally here? Seems inconsistent with the other tests and the docs...",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-04-26T16:06:53+00:00",
+        "file": "tests/custom_lookups/tests.py",
+        "line_number": 262,
+        "content": "Great question. Yes, I did this intentionally to capture the scenario that failed with `TypeError`. If I adjust this test to the more resilient pattern with unpacking, I won't capture the issue.\r\n\r\nDo you think adding a comment would help clarify?\r\n\r\n> Seems inconsistent with the other tests and the docs...\r\n\r\nRe the docs, I've only documented the unpacking syntax in the release note (addressed to users supporting multiple versions of Django) since part of the point of this change is that the prior documented behavior (which was working in most cases) now works in the edge case with `Subquery`. So I wouldn't call it inconsistent with the docs.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-04-26T16:07:51+00:00",
+        "file": "tests/custom_lookups/tests.py",
+        "line_number": 262,
+        "content": "Thanks for having a look!",
+        "type": "inline"
+      },
+      {
+        "reviewer": "browniebroke",
+        "timestamp": "2025-04-26T16:14:21+00:00",
+        "file": "tests/custom_lookups/tests.py",
+        "line_number": 262,
+        "content": "Ah got you. Thanks for the explanation. \r\n\r\n> Do you think adding a comment would help clarify?\r\n\r\nPerhaps... I stumbled on this issue in the review queue and had some basic context, so I can imagine someone else looking at the test in the future might think the same as I did? I might have been biased by the surrounding changes in the diff.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-04-26T16:39:50+00:00",
+        "file": "tests/custom_lookups/tests.py",
+        "line_number": 262,
+        "content": "Pushed a little comment in 6f1ada81c34df69290d80fa739c5956a04573bb3. Noticed there are merge conflicts, so I'll rebase in a sec.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-04-26T16:40:37+00:00",
+        "file": "tests/custom_lookups/tests.py",
+        "line_number": 262,
+        "content": "And if you're still at the sprints, raise your hand or come say hello!",
+        "type": "inline"
+      },
+      {
+        "reviewer": "browniebroke",
+        "timestamp": "2025-04-27T09:31:40+00:00",
+        "file": "tests/custom_lookups/tests.py",
+        "line_number": 262,
+        "content": "I'm around today, yes 😄 ",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-05-11T12:19:42+00:00",
+        "file": "docs/releases/6.0.txt",
+        "line_number": 0,
+        "content": "Updated in https://github.com/typeddjango/django-stubs/pull/2673",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-05-12T04:09:53+00:00",
+        "file": "tests/expressions/tests.py",
+        "line_number": 752,
+        "content": "There was some user error in that first draft of a test for JSONField.\r\n\r\nThis version passes on postgres. I had to mark a couple lookups with `continue  # expected failure`, and there are some failures on MariaDB, but it's looking alright. I can open follow-up tickets for the failures--shouldn't block this current work, I wouldn't think?\r\n\r\n```diff\r\ndiff --git a/tests/model_fields/test_jsonfield.py b/tests/model_fields/test_jsonfield.py\r\nindex 1788933774..942f6ce14d 100644\r\n--- a/tests/model_fields/test_jsonfield.py\r\n+++ b/tests/model_fields/test_jsonfield.py\r\n@@ -16,6 +16,7 @@ from django.db import (\r\n     transaction,\r\n )\r\n from django.db.models import (\r\n+    CharField,\r\n     Count,\r\n     ExpressionWrapper,\r\n     F,\r\n@@ -941,6 +942,40 @@ class TestQuerying(TestCase):\r\n             self.objs[3:5],\r\n         )\r\n \r\n+    @skipUnlessDBFeature(\"supports_json_field_contains\")\r\n+    def test_lookups_subquery(self):\r\n+        bar_value = NullableJSONModel.objects.values(\"value__bar\")[:1]\r\n+        for lookup in JSONField.get_lookups():\r\n+            with self.subTest(lookup=lookup):\r\n+                if lookup == \"isnull\":\r\n+                    continue  # not allowed, rhs must be a literal boolean.\r\n+                if lookup in {\"has_keys\", \"has_any_keys\"}:\r\n+                    continue  # expected failure.\r\n+                if lookup == \"range\":\r\n+                    continue  # unclear if we want a test case for this.\r\n+                if lookup in {\r\n+                    \"has_key\",\r\n+                    \"iexact\",\r\n+                    \"icontains\",\r\n+                    \"startswith\",\r\n+                    \"istartswith\",\r\n+                    \"endswith\",\r\n+                    \"iendswith\",\r\n+                    \"regex\",\r\n+                    \"iregex\",\r\n+                }:\r\n+                    # TODO: might be avoidable by getting more appropriate values\r\n+                    # instead of always \"bar\"\r\n+                    rhs = Subquery(\r\n+                        NullableJSONModel.objects.annotate(\r\n+                            bar__value_as_text=KT(\"value__bar\")\r\n+                        ).values(\"bar__value_as_text\")[:1]\r\n+                    )\r\n+                else:\r\n+                    rhs = Subquery(bar_value, output_field=CharField())\r\n+                qs = NullableJSONModel.objects.filter(**{f\"value__bar__{lookup}\": rhs})\r\n+                self.assertGreaterEqual(len(qs), 0)\r\n+\r\n     @skipUnlessDBFeature(\"supports_json_field_contains\")\r\n     def test_array_key_contains(self):\r\n         tests = [\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "sarahboyce",
+        "timestamp": "2025-06-11T12:12:07+00:00",
+        "file": "tests/lookup/tests.py",
+        "line_number": 0,
+        "content": "The ones I don't get test failures for are:\r\n- `RelateLookup.process_rhs` (the `gis_tests.distapp.tests.DistanceTest` tests passed for me)\r\n- `Func.as_sql`\r\n\r\nAll other line changes I do get test failures when reverting",
+        "type": "inline"
+      },
+      {
+        "reviewer": "sarahboyce",
+        "timestamp": "2025-06-11T12:14:35+00:00",
+        "file": "docs/releases/6.0.txt",
+        "line_number": 442,
+        "content": "I think this adds value. @charettes what do you think?",
+        "type": "inline"
+      },
+      {
+        "reviewer": "charettes",
+        "timestamp": "2025-06-11T13:26:19+00:00",
+        "file": "docs/releases/6.0.txt",
+        "line_number": 442,
+        "content": "I think it's worth documenting and I like the way it's phrased here. Having a location to point at in the release notes when the inevitable reports about mixing tuples and lists come in will be quite handy.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-06-12T13:59:09+00:00",
+        "file": "tests/lookup/tests.py",
+        "line_number": 0,
+        "content": "Thanks, my results agree with yours now. I'll have a look at adding some coverage in the next few days 👍 ",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-06-15T01:56:14+00:00",
+        "file": "tests/lookup/tests.py",
+        "line_number": 0,
+        "content": "I think the GIS changes are difficult to cover because the underlying lookups are already so resilient against either lists or tuples since ticket-31002. I think we can just treat these changes as code style cleanups. I did miss one for consistency: `GISLookup.get_db_prep_lookup`, just added.\r\n\r\nI added a case for `Func` (via `Lower`).",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-07-02T00:57:02+00:00",
+        "file": "tests/expressions/tests.py",
+        "line_number": 752,
+        "content": "~This test found something to fix now, so I'll spruce it up and include it.~ Never mind, I had #19459 checked out, disregard. I'll just submit this test on Trac and get an opinion about the `# expected failures`.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-08-03T02:03:14+00:00",
+        "file": "tests/expressions/tests.py",
+        "line_number": 752,
+        "content": "The trac ticket is ticket-36494.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "sarahboyce",
+        "timestamp": "2025-02-07T16:10:40+00:00",
+        "content": "Thank you for this @jacobtylerwalls :star: \r\nI like that this fixes the issue without needing to update the docs\r\nI just have a question about whether we should write more tests :+1: ",
+        "state": "COMMENTED",
+        "type": "general"
+      },
+      {
+        "reviewer": "sarahboyce",
+        "timestamp": "2025-08-01T13:14:04+00:00",
+        "content": "Thank you for your work on this @jacobtylerwalls \r\nI pushed minor tweaks to the release notes and I think this is good to go :+1: ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 128,
+      "loc_deleted": 23,
+      "num_files": 11,
+      "num_review_comments": 24,
+      "labels": []
+    }
+  },
+  {
+    "pr_id": "django/django#19924",
+    "repository": "django/django",
+    "pr_number": 19924,
+    "title": "Added missing backticks in docs/ref/models/fields.txt.",
+    "description": "",
+    "author": "felixxm",
+    "created_at": "2025-10-07T09:44:20+00:00",
+    "merged_at": "2025-10-08T08:59:00+00:00",
+    "url": "https://github.com/django/django/pull/19924",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "ngnpope",
+        "timestamp": "2025-10-07T13:02:27+00:00",
+        "file": "docs/ref/models/fields.txt",
+        "line_number": 0,
+        "content": "```suggestion\n    DELETE CASCADE`` and also deletes the object containing the :class:`ForeignKey`.\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "ngnpope",
+        "timestamp": "2025-10-07T13:03:15+00:00",
+        "file": "docs/ref/models/fields.txt",
+        "line_number": 0,
+        "content": "```suggestion\n    with this :class:`ForeignKey` will always reference the exact model you specify\n```",
+        "type": "inline"
+      }
+    ],
+    "metadata": {
+      "loc_added": 6,
+      "loc_deleted": 5,
+      "num_files": 1,
+      "num_review_comments": 2,
+      "labels": [
+        "no ticket"
+      ]
+    }
+  },
+  {
+    "pr_id": "django/django#19428",
+    "repository": "django/django",
+    "pr_number": 19428,
+    "title": "Update contributing docs for new feature ideas",
+    "description": "#### Trac ticket number\r\nN/A\r\n\r\n#### Branch description\r\nUpdates the contributing documentation to be aware of the experimental new feature idea tracker introduced by the Steering Council.\r\n\r\n#### Checklist\r\n- [ ] This PR targets the `main` branch. <!-- Backports will be evaluated and done by mergers, when necessary. -->\r\n- [ ] The commit message is written in past tense, mentions the ticket number, and ends with a period.\r\n- [ ] I have checked the \"Has patch\" ticket flag in the Trac system.\r\n- [ ] I have added or updated relevant tests.\r\n- [ ] I have added or updated relevant docs, including release notes if applicable.\r\n- [ ] I have attached screenshots in both light and dark modes for any UI changes.\r\n",
+    "author": "LilyFirefly",
+    "created_at": "2025-04-27T13:55:47+00:00",
+    "merged_at": "2025-05-14T00:38:04+00:00",
+    "url": "https://github.com/django/django/pull/19428",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "tim-schilling",
+        "timestamp": "2025-04-28T13:04:53+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 0,
+        "content": "We should add a link here for Steering Council to https://docs.djangoproject.com/en/dev/internals/organization/#steering-council",
+        "type": "inline"
+      },
+      {
+        "reviewer": "tim-schilling",
+        "timestamp": "2025-04-28T13:08:19+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 0,
+        "content": "```suggestion\r\n  ticket tracker. This is where the community and Steering Council evaluate\r\n  features for the Django eco-system. This is especially important for large-scale feature\r\n  requests. We like to discuss any big changes to Django's core before actually\r\n  working on them. We may also decide that a feature is best as a third-party\r\n  package where it can be implemented outside of Django core's release cycle.\r\n```\r\n\r\nI think we should clarify that it's evaluating features as a whole rather than whether it's core or third-party. I adjusted some of the language as well, but I'm not tied to my suggestions. I eyeballed the line lengths, so that will need to be reformatted as well.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "tim-schilling",
+        "timestamp": "2025-04-28T13:09:45+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 150,
+        "content": "I think we need sort out the differences between the flow chart and the kanban board",
+        "type": "inline"
+      },
+      {
+        "reviewer": "tim-schilling",
+        "timestamp": "2025-04-28T13:22:24+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 0,
+        "content": "```suggestion\r\n  ticket tracker. This is where the community and Steering Council evaluate\r\n  features for the Django eco-system. This is especially important for large-scale feature\r\n  requests. We like to discuss any big changes to Django's core before actually\r\n  working on them. We may also decide that a feature is best as a third-party\r\n  package where it can be implemented outside of Django core's release cycle.\r\n```\r\n\r\nI think we should clarify that it's evaluating features as a whole rather than whether it's core or third-party. I adjusted some of the language as well, but I'm not tied to my suggestions. I eyeballed the line lengths, so that will need to be reformatted as well.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "LilyFirefly",
+        "timestamp": "2025-04-28T14:33:18+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 150,
+        "content": "Yes, but maybe that can happen in a follow-up PR? I'd prefer to get this landed sooner than later.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "tim-schilling",
+        "timestamp": "2025-04-28T17:09:16+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 150,
+        "content": "Alright, that's fair.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "sarahboyce",
+        "timestamp": "2025-04-30T14:51:52+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 0,
+        "content": "I think the points that come after are very Trac specific, you might want to update them for the new feature ideas tracker to make sense",
+        "type": "inline"
+      },
+      {
+        "reviewer": "sarahboyce",
+        "timestamp": "2025-05-08T15:25:19+00:00",
+        "file": "docs/internals/contributing/triaging-tickets.txt",
+        "line_number": 0,
+        "content": "Currently, we mostly use \"Someday/Maybe\" to track work that we do want to do but can't do now because we are waiting for a particular date (such as a final release to Python etc). Once that date is arrived, it becomes accepted but indicates to others that we can't merge something for this \"yet\"\r\n\r\nI'm thinking either we leave this as it was or rewrite it :thinking: for it now to be called \"old\" is not strictly true as we're still using it",
+        "type": "inline"
+      },
+      {
+        "reviewer": "sarahboyce",
+        "timestamp": "2025-05-08T15:28:33+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 0,
+        "content": "I wonder if we lose something by removing this\r\nIt's certainly existed in other (historic) discussions and might still be used when someone summaries their opinion",
+        "type": "inline"
+      },
+      {
+        "reviewer": "tim-schilling",
+        "timestamp": "2025-05-09T12:02:00+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 150,
+        "content": "```suggestion\r\n* Done\r\n\r\nOccasionally, some discussions around feature ideas or the direction of Django\r\nwill occur on the Django Forum. These discussions may have informal votes. In these votes we\r\nfollow the voting style invented by Apache and used on Python itself, where\r\nvotes are given as +1, +0, -0, or -1.\r\nRoughly translated, these votes mean:\r\n\r\n* +1: \"I love the idea and I'm strongly committed to it.\"\r\n\r\n* +0: \"Sounds OK to me.\"\r\n\r\n* -0: \"I'm not thrilled, but I won't stand in the way.\"\r\n\r\n* -1: \"I strongly disagree and would be very unhappy to see the idea turn\r\n  into reality.\"\r\n  \r\nAlthough these votes are informal, they'll be taken very seriously. After a\r\nsuitable voting period, if an obvious consensus arises we'll follow the votes.\r\n```\r\n\r\n@sarahboyce would this address your concern about losing this context from [here](https://github.com/django/django/pull/19428/files#r2079953384)?",
+        "type": "inline"
+      },
+      {
+        "reviewer": "tim-schilling",
+        "timestamp": "2025-05-09T12:04:38+00:00",
+        "file": "docs/internals/contributing/triaging-tickets.txt",
+        "line_number": 0,
+        "content": "@LilyFoote Could we change the original text from \"It's used sparingly to keep track of high-level ideas or long-term feature requests.\" to \"It's used sparingly to keep track of long-term changes.\"? We could add Sarah's example of a change being blocked by a final release to Python since that will be a consistent case too.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "sarahboyce",
+        "timestamp": "2025-05-09T12:05:13+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 150,
+        "content": "Yes :+1: ",
+        "type": "inline"
+      },
+      {
+        "reviewer": "sarahboyce",
+        "timestamp": "2025-05-09T12:09:48+00:00",
+        "file": "docs/internals/contributing/triaging-tickets.txt",
+        "line_number": 0,
+        "content": "I think this is a good idea \r\nMaybe:\r\n```\r\nThis stage isn't shown on the diagram. It's used sparingly to keep track of\r\nlong-term changes.\r\n\r\nThese tickets are uncommon and overall less useful since they don't describe\r\ncurrently actionable issues.\r\n```\r\nI deleted the last sentence of the second paragraph and changed \"concrete\" to \"currently\"\r\n",
+        "type": "inline"
+      },
+      {
+        "reviewer": "LilyFirefly",
+        "timestamp": "2025-05-09T13:58:41+00:00",
+        "file": "docs/internals/contributing/triaging-tickets.txt",
+        "line_number": 0,
+        "content": "```suggestion\r\nThis stage isn't shown on the diagram. It's used sparingly to keep track of\r\nlong-term changes.\r\n\r\nThese tickets are uncommon and overall less useful since they don't describe\r\ncurrently actionable issues.\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-05-10T16:44:49+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 0,
+        "content": "```suggestion\r\n* Check that someone hasn't already filed the bug report by `searching`_ or\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "jacobtylerwalls",
+        "timestamp": "2025-05-10T16:46:43+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 0,
+        "content": "some whitespace to remove",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-05-13T15:42:11+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 0,
+        "content": "I'm making some small tweaks and I'm downgrading this to a subsection, so it's shown under \"reporting bugs\" in the ToC.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-05-13T15:42:45+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 0,
+        "content": "I feel \"touches on\" is weird when talking about bugs and code, so I'm changing this to \"impacts\".",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-05-13T15:55:33+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 0,
+        "content": "This change feels (to me) a bit more passive and subjective. The original phrasing encourages contributors to actively consider whether their feature belongs in core, which I think is clearer guidance. How about something more actionable like:\r\n\r\n```suggestion\r\n* Evaluate whether the feature idea requires changes in Django's core. If your\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-05-13T15:57:13+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 0,
+        "content": "I'm minimally rewording this, and I'm inclined to remove the \"First\", since there are no other \"ordered\" steps following this one. The next two bullet points feels more like sub items of this one...",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-05-13T16:02:15+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 116,
+        "content": "I don't think this is related to this PR, but this link feels unnecessary at this stage. The reader hasn't even requested the new feature yet or know whether it will be accepted yet we are linking on how to document it. I think we should replace it with a link to where the new feature ideas updated workflow is described, or if we don't have such doc, just remove this.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-05-13T16:26:27+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 0,
+        "content": "This is good clarification but I think we should include *where* these reactions are expected. The top bottom flow in this doc does not make it obvious that we are referring to the new features ideas process in particular. I'll push a suggestion.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-05-13T16:46:26+00:00",
+        "file": "docs/internals/contributing/bugs-and-features.txt",
+        "line_number": 0,
+        "content": "All these mentions of Steering Council should not be an absolute link, these should be a local ref (I'll push a fix).",
+        "type": "inline"
+      },
+      {
+        "reviewer": "tim-schilling",
+        "timestamp": "2025-04-28T13:23:27+00:00",
+        "content": "I'm generally good with this. Marking as request for changes because explanation of stages needs to be revisited by the SC before that can be added. I'm not sure that's actually defined.",
+        "state": "CHANGES_REQUESTED",
+        "type": "general"
+      },
+      {
+        "reviewer": "sarahboyce",
+        "timestamp": "2025-05-08T15:30:32+00:00",
+        "content": "Thank you for the updates! This looks good\r\nI have added a couple of thoughts/questions. I think it would be good to get @nessita 's opinion also :+1: ",
+        "state": "COMMENTED",
+        "type": "general"
+      },
+      {
+        "reviewer": "nessita",
+        "timestamp": "2025-05-13T19:15:36+00:00",
+        "content": "Thank you @LilyAcorn, this looks great! And thank you Tim and Sarah for the thorough review. I will soon push what I consider final tweaks and I think this is ready to merge once CI is green again.",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 97,
+      "loc_deleted": 78,
+      "num_files": 5,
+      "num_review_comments": 26,
+      "labels": [
+        "no ticket"
+      ]
+    }
+  },
+  {
+    "pr_id": "microsoft/playwright-python#2980",
+    "repository": "microsoft/playwright-python",
+    "pr_number": 2980,
+    "title": "fix: prevent ProtocolCallback memory leak during tracing (#2977)",
+    "description": "Fix memory leak where ProtocolCallback objects accumulated when tracing was enabled. The issue affected both sync and async Playwright, but was more severe in async usage where callbacks persisted permanently.\r\n\r\n## Root Cause\r\n- When tracing is enabled, send_no_reply() creates ProtocolCallback objects\r\n- These callbacks have circular references via task cancellation handlers\r\n- For no_reply messages, futures are never resolved, preventing GC cleanup\r\n- Each page operation during tracing leaked ~10 callbacks permanently\r\n\r\n## Solution\r\n- Add no_reply parameter to ProtocolCallback constructor\r\n- For no_reply=True: skip cancellation setup and resolve future immediately\r\n- For no_reply=False: use full constructor with cancellation handling\r\n- Update dispatch() to handle missing callbacks gracefully\r\n\r\n## Testing\r\n- Added regression test in test_reference_count_async.py\r\n- Test fails before fix (30+ leaked callbacks) and passes after (≤5)\r\n- All existing tracing and asyncio tests continue to pass\r\n\r\nFixes https://github.com/microsoft/playwright-python/issues/2977",
+    "author": "mxschmitt",
+    "created_at": "2025-09-23T10:18:18+00:00",
+    "merged_at": "2025-10-07T13:36:52+00:00",
+    "url": "https://github.com/microsoft/playwright-python/pull/2980",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2025-09-29T09:57:24+00:00",
+        "content": "Looks good, but bots are not happy.",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 66,
+      "loc_deleted": 3,
+      "num_files": 2,
+      "num_review_comments": 1,
+      "labels": []
+    }
+  },
+  {
+    "pr_id": "microsoft/playwright-python#2321",
+    "repository": "microsoft/playwright-python",
+    "pr_number": 2321,
+    "title": "fix: report route handler errors to the user after they completed",
+    "description": "Issue: Exceptions which will get thrown in route handlers after route.{fulfill,continue,abort} got called,\r\nwon't get surfaced to the user in the sync and async version of Playwright for Python.\r\n\r\nScope: Event handlers which use asyncio.create_task\r\n  - {BrowserContext,Page}.on(\"route\")\r\n  - {Page}.on({\"route\", \"locatorHandlerTriggered\"})\r\n\r\nThere were multiple issues in the implementation:\r\n\r\n1. `playwright/_impl/_helper.py` (sync only): we were only waiting until a handler's {continue,fulfill,abort} got called, and did not wait until the actual callback completed. Fix: Wait until the handler completed.\r\n2. `playwright/_impl/_connection.py:423` (sync only): We call event listeners manually, this means that `pyee`'s `\"error\"` event is not working there. Fix: attach a done callback manually, like pyee is doing inside their library.\r\n3. `playwright/_impl/_connection.py:56` (async): attach an `\"error\"` event handler for the async error reporting\r\n4. `playwright/_impl/_connection.py:90` if we report an error to the user, we should cancel the underlying future otherwise a warning gets emitted, that there was a future exception never received.\r\n\r\nThis should resolve https://github.com/microsoft/playwright-python/issues/2136.",
+    "author": "mxschmitt",
+    "created_at": "2024-02-26T12:58:39+00:00",
+    "merged_at": "2024-02-26T18:24:50+00:00",
+    "url": "https://github.com/microsoft/playwright-python/pull/2321",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2024-02-26T17:19:18+00:00",
+        "file": "tests/async/test_browsercontext_request_intercept.py",
+        "line_number": 193,
+        "content": "```suggestion\r\n    # Any next API call should throw because handler did throw during previous goto()\r\n    with pytest.raises(Exception, match=\"Exception text!?\"):\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2024-02-26T17:22:00+00:00",
+        "file": "playwright/_impl/_connection.py",
+        "line_number": 0,
+        "content": "Perhaps we should first check the error, and if there is no error, only then send the message?",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2024-02-26T17:30:14+00:00",
+        "file": "playwright/_impl/_connection.py",
+        "line_number": 427,
+        "content": "Let's make sure we have test coverage for this.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2024-02-26T17:31:02+00:00",
+        "file": "playwright/_impl/_connection.py",
+        "line_number": 454,
+        "content": "```suggestion\r\n        # Save the error to throw at the next API call. This \"replicates\" unhandled rejection in Node.js.\r\n        self._error = exc\r\n```",
+        "type": "inline"
+      }
+    ],
+    "metadata": {
+      "loc_added": 64,
+      "loc_deleted": 11,
+      "num_files": 6,
+      "num_review_comments": 4,
+      "labels": []
+    }
+  },
+  {
+    "pr_id": "microsoft/playwright-python#2956",
+    "repository": "microsoft/playwright-python",
+    "pr_number": 2956,
+    "title": "chore: roll to 1.55.0",
+    "description": "Closes https://github.com/microsoft/playwright-python/issues/2917",
+    "author": "Skn0tt",
+    "created_at": "2025-08-20T07:15:30+00:00",
+    "merged_at": "2025-08-21T15:08:58+00:00",
+    "url": "https://github.com/microsoft/playwright-python/pull/2956",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-08-21T14:53:15+00:00",
+        "file": "tests/async/test_extension.py",
+        "line_number": 44,
+        "content": "nit: context.append + close like we do in the other file",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-08-21T14:53:40+00:00",
+        "file": "tests/async/test_extension.py",
+        "line_number": 0,
+        "content": "nit: add types",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-08-21T14:53:48+00:00",
+        "file": "tests/async/test_extension.py",
+        "line_number": 0,
+        "content": "```suggestion\n    context = await launch_persistent_context(extension_path)\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-08-21T14:53:56+00:00",
+        "file": "tests/async/test_extension.py",
+        "line_number": 0,
+        "content": "nit: add types",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-08-21T14:54:02+00:00",
+        "file": "tests/async/test_extension.py",
+        "line_number": 0,
+        "content": "```suggestion\n    context = await launch_persistent_context(\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-08-21T14:54:08+00:00",
+        "file": "tests/async/test_extension.py",
+        "line_number": 0,
+        "content": "nit: types",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-08-21T14:54:14+00:00",
+        "file": "tests/async/test_extension.py",
+        "line_number": 0,
+        "content": "```suggestion\n    context = await launch_persistent_context(extension_path)\n```",
+        "type": "inline"
+      }
+    ],
+    "metadata": {
+      "loc_added": 352,
+      "loc_deleted": 92,
+      "num_files": 18,
+      "num_review_comments": 7,
+      "labels": []
+    }
+  },
+  {
+    "pr_id": "microsoft/playwright-python#2951",
+    "repository": "microsoft/playwright-python",
+    "pr_number": 2951,
+    "title": "fix: screenshot type inferred from path file extension",
+    "description": "The `screenshot` methods for both element and page do not really infer file type from `path` file extension if `type` is not provided. I tried some name like 'xxx.jpeg' without `type` in arguments, the generated file format was actually png.\r\nThis pull request is trying to fix this.\r\n\r\nFixes https://github.com/microsoft/playwright-python/issues/2955",
+    "author": "xianghuzhao",
+    "created_at": "2025-08-15T13:09:38+00:00",
+    "merged_at": "2025-08-19T13:17:09+00:00",
+    "url": "https://github.com/microsoft/playwright-python/pull/2951",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-08-19T06:22:56+00:00",
+        "content": "Looks great! Any chance for a test? Ideally in `tests/async/test_screenshot.py`.",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 49,
+      "loc_deleted": 1,
+      "num_files": 3,
+      "num_review_comments": 1,
+      "labels": []
+    }
+  },
+  {
+    "pr_id": "microsoft/playwright-python#2934",
+    "repository": "microsoft/playwright-python",
+    "pr_number": 2934,
+    "title": "test: unflake dialog inline script test",
+    "description": "Fixes https://github.com/microsoft/playwright-python/actions/runs/16736165470/job/47375331127?pr=2933#step:6:860",
+    "author": "mxschmitt",
+    "created_at": "2025-08-05T07:54:22+00:00",
+    "merged_at": "2025-08-05T08:46:40+00:00",
+    "url": "https://github.com/microsoft/playwright-python/pull/2934",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "Skn0tt",
+        "timestamp": "2025-08-05T08:43:01+00:00",
+        "file": "tests/sync/test_browsercontext_events.py",
+        "line_number": 188,
+        "content": "today I learned about python's `with` - what a neat syntax!",
+        "type": "inline"
+      }
+    ],
+    "metadata": {
+      "loc_added": 11,
+      "loc_deleted": 9,
+      "num_files": 1,
+      "num_review_comments": 1,
+      "labels": []
+    }
+  },
+  {
+    "pr_id": "microsoft/playwright-python#2925",
+    "repository": "microsoft/playwright-python",
+    "pr_number": 2925,
+    "title": "chore: update pre-commit / linters",
+    "description": "",
+    "author": "mxschmitt",
+    "created_at": "2025-07-22T12:43:35+00:00",
+    "merged_at": "2025-07-22T14:54:59+00:00",
+    "url": "https://github.com/microsoft/playwright-python/pull/2925",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "Skn0tt",
+        "timestamp": "2025-07-22T14:49:18+00:00",
+        "content": "today I learned `nonlocal`.",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 11,
+      "loc_deleted": 15,
+      "num_files": 9,
+      "num_review_comments": 1,
+      "labels": []
+    }
+  },
+  {
+    "pr_id": "microsoft/playwright-python#2913",
+    "repository": "microsoft/playwright-python",
+    "pr_number": 2913,
+    "title": "chore: roll to 1.54.0",
+    "description": "Completes #2879.",
+    "author": "agg23",
+    "created_at": "2025-07-09T18:25:48+00:00",
+    "merged_at": "2025-07-11T15:06:16+00:00",
+    "url": "https://github.com/microsoft/playwright-python/pull/2913",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2025-07-11T07:44:46+00:00",
+        "file": "README.md",
+        "line_number": 0,
+        "content": "Since the PR says \"roll to 1.54\", I'd think WebKit version should be \"26.0\".",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2025-07-11T07:50:56+00:00",
+        "file": "playwright/_impl/_api_structures.py",
+        "line_number": 0,
+        "content": "Can we leave this one as `Cookie`, and introduce a `StorageStateCookie` instead? I'd think it's much more common to use `Cookie` for add/get, doubly so because we export `Cookie` type as a public API.",
+        "type": "inline"
+      }
+    ],
+    "metadata": {
+      "loc_added": 338,
+      "loc_deleted": 92,
+      "num_files": 31,
+      "num_review_comments": 2,
+      "labels": []
+    }
+  },
+  {
+    "pr_id": "microsoft/playwright-python#2915",
+    "repository": "microsoft/playwright-python",
+    "pr_number": 2915,
+    "title": "fix: Make context manager __exit__/__aexit__ signatures compatible with typing protocols",
+    "description": "Updates `AsyncContextManager.__aexit__` and `SyncContextManager.__exit__` to use Optional types for exception parameters (exc_type, exc_val, traceback) to match the standard Python typing protocols.\r\n\r\nThis aligns with the official type definitions in typeshed where AbstractContextManager and AbstractAsyncContextManager define these parameters as Optional since they are None when no exception occurs.\r\n\r\nRef: https://github.com/python/typeshed/blob/9317dc62bd4fb46b8b48ce5353286cab80308d47/stdlib/contextlib.pyi#L52-L54\r\n\r\nFixes type checker compatibility issues when using BrowserContext with type checkers that enforce strict protocol compliance.\r\n\r\nFixes https://github.com/microsoft/playwright-python/issues/2856",
+    "author": "mxschmitt",
+    "created_at": "2025-07-10T09:40:04+00:00",
+    "merged_at": "2025-07-10T11:11:09+00:00",
+    "url": "https://github.com/microsoft/playwright-python/pull/2915",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "Skn0tt",
+        "timestamp": "2025-07-10T09:40:42+00:00",
+        "content": "Exceptional!",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 6,
+      "loc_deleted": 6,
+      "num_files": 2,
+      "num_review_comments": 1,
+      "labels": []
+    }
+  },
+  {
+    "pr_id": "microsoft/playwright-python#2900",
+    "repository": "microsoft/playwright-python",
+    "pr_number": 2900,
+    "title": "chore: explicit timeout config for send",
+    "description": "Follow up from #2892. Remove implicit timeout information in server calls and make it explicit and required.",
+    "author": "agg23",
+    "created_at": "2025-06-24T15:55:07+00:00",
+    "merged_at": "2025-06-25T16:15:21+00:00",
+    "url": "https://github.com/microsoft/playwright-python/pull/2900",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "agg23",
+        "timestamp": "2025-06-24T19:15:27+00:00",
+        "file": "playwright/_impl/_connection.py",
+        "line_number": 0,
+        "content": "I really don't like how this is different. It's unclear to my why `send_no_reply` implies no removal of `None`s.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2025-06-24T19:47:04+00:00",
+        "file": "playwright/_impl/_clock.py",
+        "line_number": 0,
+        "content": "I don't think clock had any timeouts before. Should be `None` in this file.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2025-06-24T19:48:23+00:00",
+        "file": "playwright/_impl/_connection.py",
+        "line_number": 0,
+        "content": "This one should be removed?",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2025-06-24T19:50:56+00:00",
+        "file": "playwright/_impl/_element_handle.py",
+        "line_number": 0,
+        "content": "Most methods in this class do not have a timeout, but some do. Please align with Node.js code to avoid any changes in behavior.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2025-06-24T19:52:36+00:00",
+        "file": "playwright/_impl/_fetch.py",
+        "line_number": 0,
+        "content": "No timeout for `dispose`.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2025-06-24T19:53:07+00:00",
+        "file": "playwright/_impl/_fetch.py",
+        "line_number": 0,
+        "content": "No timeout here.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2025-06-24T19:53:45+00:00",
+        "file": "playwright/_impl/_frame.py",
+        "line_number": 0,
+        "content": "No timeout here.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2025-06-25T15:08:41+00:00",
+        "file": "playwright/_impl/_connection.py",
+        "line_number": 0,
+        "content": "```suggestion\r\n            result[k] = _filter_none(v)\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2025-06-25T15:12:01+00:00",
+        "file": "playwright/_impl/_frame.py",
+        "line_number": 0,
+        "content": "I don't think we need `self._timeout` here.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2025-06-24T19:54:37+00:00",
+        "content": "I started to annotate places that now have a timeout, but previously did not, but there are too many. Could you please align with Node.js to avoid behavior changes?",
+        "state": "COMMENTED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 478,
+      "loc_deleted": 236,
+      "num_files": 26,
+      "num_review_comments": 10,
+      "labels": []
+    }
+  },
+  {
+    "pr_id": "microsoft/playwright-python#2892",
+    "repository": "microsoft/playwright-python",
+    "pr_number": 2892,
+    "title": "chore: roll to 1.53.1",
+    "description": "Originally mirrored https://github.com/microsoft/playwright-dotnet/pull/3184, but due to the selector bug (https://github.com/microsoft/playwright/pull/36227) causing half the Python tests to fail, the roll had to be made to include this change. Thus the roll is the entire roll to `1.53.1`.\r\n\r\nImplements changes from https://github.com/microsoft/playwright/pull/35888, https://github.com/microsoft/playwright/pull/35969, and https://github.com/microsoft/playwright/pull/35988, among others.\r\n\r\nReferences #2818",
+    "author": "agg23",
+    "created_at": "2025-06-17T18:21:51+00:00",
+    "merged_at": "2025-06-24T17:52:34+00:00",
+    "url": "https://github.com/microsoft/playwright-python/pull/2892",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "agg23",
+        "timestamp": "2025-06-20T18:32:58+00:00",
+        "file": "playwright/_impl/_browser_type.py",
+        "line_number": 0,
+        "content": "This is copied from `_browser.py`, with the changes being this line and below.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-06-21T17:06:25+00:00",
+        "file": "playwright/_impl/_browser.py",
+        "line_number": 74,
+        "content": "nit: why don't we have this upstream?",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-06-21T17:08:46+00:00",
+        "file": "playwright/_impl/_browser_context.py",
+        "line_number": 0,
+        "content": "```suggestion\r\n        self._options: Dict[str, Any] = initializer[\"options\"]\r\n```\r\naccording to the protocol this can't be null?",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-06-21T17:10:58+00:00",
+        "file": "playwright/_impl/_browser_context.py",
+        "line_number": 0,
+        "content": "```suggestion\r\n```\r\n\r\nI don't think we need that check. 313 already checks for that?",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-06-21T17:11:17+00:00",
+        "file": "playwright/_impl/_browser_context.py",
+        "line_number": 0,
+        "content": "```suggestion\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-06-21T17:12:03+00:00",
+        "file": "playwright/_impl/_browser_context.py",
+        "line_number": 0,
+        "content": "```suggestion\r\n            if self in self._browser._contexts:\r\n                self._browser._contexts.remove(self)\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-06-21T17:12:35+00:00",
+        "file": "playwright/_impl/_browser_context.py",
+        "line_number": 0,
+        "content": "```suggestion\r\n            if self in self._browser._browser_type._playwright.selectors._contextsForSelectors:\r\n                self._browser._browser_type._playwright.selectors._contextsForSelectors.remove(\r\n                    self\r\n                )\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-06-21T17:17:42+00:00",
+        "file": "playwright/_impl/_connection.py",
+        "line_number": 0,
+        "content": "Do we have cases for this branch? looks the same so we can combine the two branches into one if statement?",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-06-21T17:19:16+00:00",
+        "file": "playwright/_impl/_frame.py",
+        "line_number": 0,
+        "content": "When do we end up in that if? I'd like to either not have this if or add a more detailed comment.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-06-21T17:20:18+00:00",
+        "file": "playwright/_impl/_local_utils.py",
+        "line_number": 28,
+        "content": "I guess we can remove this entire method now?",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-06-21T17:21:12+00:00",
+        "file": "playwright/_impl/_selectors.py",
+        "line_number": 0,
+        "content": "```suggestion\r\n        self._context_for_selectors: Set[BrowserContext] = set()\r\n        self._selector_engines: List[Dict] = []\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-06-21T17:21:28+00:00",
+        "file": "playwright/_impl/_selectors.py",
+        "line_number": 0,
+        "content": "```suggestion\r\n        self._test_id_attribute_name: Optional[str] = None\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-06-21T17:21:51+00:00",
+        "file": "playwright/_impl/_selectors.py",
+        "line_number": 0,
+        "content": "```suggestion\r\n                \"registerSelectorEngine\", {\"selectorEngine\": engine}\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-06-21T17:22:53+00:00",
+        "file": "tests/async/test_assertions.py",
+        "line_number": 0,
+        "content": "Looks like a bug? I think it should include to_contain_text or even better `expect(locator).to_contain_class`.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-06-21T17:23:53+00:00",
+        "file": "tests/sync/test_route_web_socket.py",
+        "line_number": 0,
+        "content": "```suggestion\r\n    context.close()\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "agg23",
+        "timestamp": "2025-06-23T13:35:09+00:00",
+        "file": "playwright/_impl/_browser.py",
+        "line_number": 74,
+        "content": "We do; it's just slightly different. Node stores all of the `LaunchOptions` passed to `launch`, but .NET and Python only use the traces dir, so they both store them on their own.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "agg23",
+        "timestamp": "2025-06-23T14:01:06+00:00",
+        "file": "playwright/_impl/_local_utils.py",
+        "line_number": 28,
+        "content": "I don't understand. It's still in use in several places (`_network.py`, `_tracing.py`)",
+        "type": "inline"
+      },
+      {
+        "reviewer": "mxschmitt",
+        "timestamp": "2025-06-23T14:34:31+00:00",
+        "file": "playwright/_impl/_local_utils.py",
+        "line_number": 28,
+        "content": "I think it was fully removed: https://github.com/microsoft/playwright/commit/0e9cf0a3ade3af61ab86ed56bcd64d6684e1043d",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2025-06-24T14:24:47+00:00",
+        "file": "playwright/_impl/_browser.py",
+        "line_number": 0,
+        "content": "style: shouldn't all arguments be snake_case?",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2025-06-24T14:25:21+00:00",
+        "file": "playwright/_impl/_browser.py",
+        "line_number": 0,
+        "content": "I think we should remove the assignment in line 68.",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2025-06-24T14:47:19+00:00",
+        "file": "playwright/_impl/_input.py",
+        "line_number": 85,
+        "content": "Fancy!",
+        "type": "inline"
+      },
+      {
+        "reviewer": "dgozman",
+        "timestamp": "2025-06-24T14:52:00+00:00",
+        "content": "I'd like a follow up with an explicit timeout in each method, instead of a global \"timeout calculator\". It feels like that would be less magic and not so bad in terms of code.",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 782,
+      "loc_deleted": 539,
+      "num_files": 34,
+      "num_review_comments": 22,
+      "labels": []
+    }
+  },
+  {
+    "pr_id": "tiangolo/sqlmodel#1578",
+    "repository": "tiangolo/sqlmodel",
+    "pr_number": 1578,
+    "title": "⬆️ Add support for Python 3.14",
+    "description": "Adding support for Python 3.14 by expanding the test suite, adding the classifier, and fixing a compat issue with Pydantic.\r\n\r\nSince https://github.com/pydantic/pydantic/pull/11991 (Pydantic 2.12.0 for Python 3.14), `annotations` are retrieved [differently](https://github.com/pydantic/pydantic/pull/11991/files#diff-ea75a1ef1da6bb38913477e979605f6a05e2ffe8c28fe47d9b798c89ba436c7c). We need to do the same, or will end up with an empty `dict` in `class_dict[\"annotations\"]`, which will ultimately result in a `pydantic.errors.PydanticUserError` stating that a certain field requires a type annotation.\r\n\r\nThe implementation here should be bwd-compat for previous versions of Pydantic v2 (tested locally).\r\n\r\nNote that Pydantic v1 won't be supported on Python 3.14: https://github.com/pydantic/pydantic/issues/11613#issuecomment-3242513660",
+    "author": "svlandeg",
+    "created_at": "2025-09-26T12:41:15+00:00",
+    "merged_at": "2025-10-08T16:26:34+00:00",
+    "url": "https://github.com/fastapi/sqlmodel/pull/1578",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "svlandeg",
+        "timestamp": "2025-10-08T14:24:35+00:00",
+        "file": "sqlmodel/_compat.py",
+        "line_number": 127,
+        "content": "Note that https://github.com/fastapi/sqlmodel/discussions/1594 proposes an alternative implementation, using `class_dict.get(\"__annotate_func__\")`",
+        "type": "inline"
+      },
+      {
+        "reviewer": "tiangolo",
+        "timestamp": "2025-10-08T16:26:05+00:00",
+        "content": "Nice! And now we get to use `annotationlib`! 😎 🚀 \n\nI reviewed it thoroughly, read all the `annotationlib` docs and best practices document, and the implementation in Pydatnic. It all looks good to me. 🎉 ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 21,
+      "loc_deleted": 4,
+      "num_files": 3,
+      "num_review_comments": 2,
+      "labels": [
+        "upgrade"
+      ]
+    }
+  },
+  {
+    "pr_id": "tiangolo/sqlmodel#1590",
+    "repository": "tiangolo/sqlmodel",
+    "pr_number": 1590,
+    "title": "✅ Add test that runs select with 3 or 4 arguments",
+    "description": "Ensure that `_expression_select_gen.py` works properly and provides the right type hints for code that calls `select()` with 3 or 4 arguments.\r\n\r\nNote that I already provided some code to call `select` with 5 arguments as well. This works and runs, but [won't succeed](https://github.com/fastapi/sqlmodel/actions/runs/18286928977/job/52064312337) on a `mypy` check, as [reported](https://github.com/fastapi/sqlmodel/issues/271) before.\r\n\r\nWhile I think this PR is useful on its own, it's also in preparation of https://github.com/fastapi/sqlmodel/pull/1560.",
+    "author": "svlandeg",
+    "created_at": "2025-10-06T15:36:44+00:00",
+    "merged_at": "2025-10-08T10:53:29+00:00",
+    "url": "https://github.com/fastapi/sqlmodel/pull/1590",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "tiangolo",
+        "timestamp": "2025-10-08T10:53:10+00:00",
+        "content": "Nice, let's get this in, thank you! 🚀 ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 65,
+      "loc_deleted": 0,
+      "num_files": 2,
+      "num_review_comments": 1,
+      "labels": [
+        "internal"
+      ]
+    }
+  },
+  {
+    "pr_id": "tiangolo/sqlmodel#1560",
+    "repository": "tiangolo/sqlmodel",
+    "pr_number": 1560,
+    "title": "⬆ Bump mypy from 1.4.1 to 1.18.2",
+    "description": "Bumps [mypy](https://github.com/python/mypy) from 1.4.1 to 1.18.1.\n<details>\n<summary>Changelog</summary>\n<p><em>Sourced from <a href=\"https://github.com/python/mypy/blob/master/CHANGELOG.md\">mypy's changelog</a>.</em></p>\n<blockquote>\n<h1>Mypy Release Notes</h1>\n<h2>Next Release</h2>\n<h2>Mypy 1.18</h2>\n<p>We’ve just uploaded mypy 1.18 to the Python Package Index (<a href=\"https://pypi.org/project/mypy/\">PyPI</a>).\nMypy is a static type checker for Python. This release includes new features, performance\nimprovements and bug fixes. You can install it as follows:</p>\n<pre><code>python3 -m pip install -U mypy\n</code></pre>\n<p>You can read the full documentation for this release on <a href=\"http://mypy.readthedocs.io\">Read the Docs</a>.</p>\n<h3>Mypy Performance Improvements</h3>\n<p>Mypy 1.18 includes numerous performance improvements, resulting in about 40% speedup\ncompared to 1.17 when type checking mypy itself. In extreme cases, the improvement\ncan be 10x or higher. The list below is an overview of the various mypy optimizations.\nMany mypyc improvements (discussed in a separate section below) also improve performance.</p>\n<p>Type caching optimizations have a small risk of causing regressions. When\nreporting issues with unexpected inferred types, please also check if\n<code>--disable-expression-cache</code> will work around the issue, as it turns off some of\nthese optimizations.</p>\n<ul>\n<li>Improve self check performance by 1.8% (Jukka Lehtosalo, PR <a href=\"https://redirect.github.com/python/mypy/pull/19768\">19768</a>, <a href=\"https://redirect.github.com/python/mypy/pull/19769\">19769</a>, <a href=\"https://redirect.github.com/python/mypy/pull/19770\">19770</a>)</li>\n<li>Optimize fixed-format deserialization (Ivan Levkivskyi, PR <a href=\"https://redirect.github.com/python/mypy/pull/19765\">19765</a>)</li>\n<li>Use macros to optimize fixed-format deserialization (Ivan Levkivskyi, PR <a href=\"https://redirect.github.com/python/mypy/pull/19757\">19757</a>)</li>\n<li>Two additional micro‑optimizations (Ivan Levkivskyi, PR <a href=\"https://redirect.github.com/python/mypy/pull/19627\">19627</a>)</li>\n<li>Another set of micro‑optimizations (Ivan Levkivskyi, PR <a href=\"https://redirect.github.com/python/mypy/pull/19633\">19633</a>)</li>\n<li>Cache common types (Ivan Levkivskyi, PR <a href=\"https://redirect.github.com/python/mypy/pull/19621\">19621</a>)</li>\n<li>Skip more method bodies in third‑party libraries for speed (Ivan Levkivskyi, PR <a href=\"https://redirect.github.com/python/mypy/pull/19586\">19586</a>)</li>\n<li>Simplify the representation of callable types (Ivan Levkivskyi, PR <a href=\"https://redirect.github.com/python/mypy/pull/19580\">19580</a>)</li>\n<li>Add cache for types of some expressions (Ivan Levkivskyi, PR <a href=\"https://redirect.github.com/python/mypy/pull/19505\">19505</a>)</li>\n<li>Use cache for dictionary expressions (Ivan Levkivskyi, PR <a href=\"https://redirect.github.com/python/mypy/pull/19536\">19536</a>)</li>\n<li>Use cache for binary operations (Ivan Levkivskyi, PR <a href=\"https://redirect.github.com/python/mypy/pull/19523\">19523</a>)</li>\n<li>Cache types of type objects (Ivan Levkivskyi, PR <a href=\"https://redirect.github.com/python/mypy/pull/19514\">19514</a>)</li>\n<li>Avoid duplicate work when checking boolean operations (Ivan Levkivskyi, PR <a href=\"https://redirect.github.com/python/mypy/pull/19515\">19515</a>)</li>\n<li>Optimize generic inference passes (Ivan Levkivskyi, PR <a href=\"https://redirect.github.com/python/mypy/pull/19501\">19501</a>)</li>\n<li>Speed up the default plugin (Jukka Lehtosalo, PRs <a href=\"https://redirect.github.com/python/mypy/pull/19385\">19385</a> and <a href=\"https://redirect.github.com/python/mypy/pull/19462\">19462</a>)</li>\n<li>Remove nested imports from the default plugin (Ivan Levkivskyi, PR <a href=\"https://redirect.github.com/python/mypy/pull/19388\">19388</a>)</li>\n<li>Micro‑optimize type expansion (Jukka Lehtosalo, PR <a href=\"https://redirect.github.com/python/mypy/pull/19461\">19461</a>)</li>\n<li>Micro‑optimize type indirection (Jukka Lehtosalo, PR <a href=\"https://redirect.github.com/python/mypy/pull/19460\">19460</a>)</li>\n<li>Micro‑optimize the plugin framework (Jukka Lehtosalo, PR <a href=\"https://redirect.github.com/python/mypy/pull/19464\">19464</a>)</li>\n<li>Avoid temporary set creation in subtype checking (Jukka Lehtosalo, PR <a href=\"https://redirect.github.com/python/mypy/pull/19463\">19463</a>)</li>\n<li>Subtype checking micro‑optimization (Jukka Lehtosalo, PR <a href=\"https://redirect.github.com/python/mypy/pull/19384\">19384</a>)</li>\n<li>Return early where possible in subtype check (Stanislav Terliakov, PR <a href=\"https://redirect.github.com/python/mypy/pull/19400\">19400</a>)</li>\n<li>Deduplicate some types before joining (Stanislav Terliakov, PR <a href=\"https://redirect.github.com/python/mypy/pull/19409\">19409</a>)</li>\n<li>Speed up type checking by caching argument inference context (Jukka Lehtosalo, PR <a href=\"https://redirect.github.com/python/mypy/pull/19323\">19323</a>)</li>\n</ul>\n<!-- raw HTML omitted -->\n</blockquote>\n<p>... (truncated)</p>\n</details>\n<details>\n<summary>Commits</summary>\n<ul>\n<li><a href=\"https://github.com/python/mypy/commit/03fbaa941bccc3a9f8aea796d586603b67119bf2\"><code>03fbaa9</code></a> bump version to 1.18.1 due to wheels failure</li>\n<li><a href=\"https://github.com/python/mypy/commit/b44a1fbf0cf9fd90fd29d6bcd9f64c55dd2fd4c8\"><code>b44a1fb</code></a> removed +dev from version</li>\n<li><a href=\"https://github.com/python/mypy/commit/7197a99d1aebb1b7a584f82a53c44efb7dddf136\"><code>7197a99</code></a> Removed Unreleased in the Changelog for Release 1.18 (<a href=\"https://redirect.github.com/python/mypy/issues/19827\">#19827</a>)</li>\n<li><a href=\"https://github.com/python/mypy/commit/ee61cec0d654463874ddee3a60914f0a6cd08222\"><code>ee61cec</code></a> Updates to 1.18 changelog (<a href=\"https://redirect.github.com/python/mypy/issues/19826\">#19826</a>)</li>\n<li><a href=\"https://github.com/python/mypy/commit/24eed0bd0bb1107ede163ed314082a0f3e7dbbc4\"><code>24eed0b</code></a> Initial changelog for release 1.18 (<a href=\"https://redirect.github.com/python/mypy/issues/19818\">#19818</a>)</li>\n<li><a href=\"https://github.com/python/mypy/commit/0ca1f2a7e50ed38eed95ecf8c1f2df1057da902d\"><code>0ca1f2a</code></a> Expose --fixed-format-cache if compiled (<a href=\"https://redirect.github.com/python/mypy/issues/19815\">#19815</a>)</li>\n<li><a href=\"https://github.com/python/mypy/commit/2ce1bb225f3ced0ad4b2080af8a9a0eb39f8b38e\"><code>2ce1bb2</code></a> [mypyc] Fix subclass processing in detect_undefined_bitmap (<a href=\"https://redirect.github.com/python/mypy/issues/19787\">#19787</a>)</li>\n<li><a href=\"https://github.com/python/mypy/commit/a6b55f061d6a352e7d272ec5bc890650b7187380\"><code>a6b55f0</code></a> feat: new mypyc primitives for weakref.proxy (<a href=\"https://redirect.github.com/python/mypy/issues/19217\">#19217</a>)</li>\n<li><a href=\"https://github.com/python/mypy/commit/5a323dd2f8927eb958835e51916402c27ec2f31f\"><code>5a323dd</code></a> Make --allow-redefinition-new argument public (<a href=\"https://redirect.github.com/python/mypy/issues/19796\">#19796</a>)</li>\n<li><a href=\"https://github.com/python/mypy/commit/8638eb40aa7b9d3088f17ab005c538c86c752edd\"><code>8638eb4</code></a> [stubtest] temporary <code>--ignore-disjoint-bases</code> flag (<a href=\"https://redirect.github.com/python/mypy/issues/19740\">#19740</a>)</li>\n<li>Additional commits viewable in <a href=\"https://github.com/python/mypy/compare/v1.4.1...v1.18.1\">compare view</a></li>\n</ul>\n</details>\n<br />\n\n\n[![Dependabot compatibility score](https://dependabot-badges.githubapp.com/badges/compatibility_score?dependency-name=mypy&package-manager=pip&previous-version=1.4.1&new-version=1.18.1)](https://docs.github.com/en/github/managing-security-vulnerabilities/about-dependabot-security-updates#about-compatibility-scores)\n\nDependabot will resolve any conflicts with this PR as long as you don't alter it yourself. You can also trigger a rebase manually by commenting `@dependabot rebase`.\n\n[//]: # (dependabot-automerge-start)\n[//]: # (dependabot-automerge-end)\n\n---\n\n<details>\n<summary>Dependabot commands and options</summary>\n<br />\n\nYou can trigger Dependabot actions by commenting on this PR:\n- `@dependabot rebase` will rebase this PR\n- `@dependabot recreate` will recreate this PR, overwriting any edits that have been made to it\n- `@dependabot merge` will merge this PR after your CI passes on it\n- `@dependabot squash and merge` will squash and merge this PR after your CI passes on it\n- `@dependabot cancel merge` will cancel a previously requested merge and block automerging\n- `@dependabot reopen` will reopen this PR if it is closed\n- `@dependabot close` will close this PR and stop Dependabot recreating it. You can achieve the same result by closing it manually\n- `@dependabot show <dependency name> ignore conditions` will show all of the ignore conditions of the specified dependency\n- `@dependabot ignore this major version` will close this PR and stop Dependabot creating any more for this major version (unless you reopen the PR or upgrade to it yourself)\n- `@dependabot ignore this minor version` will close this PR and stop Dependabot creating any more for this minor version (unless you reopen the PR or upgrade to it yourself)\n- `@dependabot ignore this dependency` will close this PR and stop Dependabot creating any more for this dependency (unless you reopen the PR or upgrade to it yourself)\n\n\n</details>",
+    "author": "dependabot[bot]",
+    "created_at": "2025-09-12T22:03:00+00:00",
+    "merged_at": "2025-10-08T11:10:30+00:00",
+    "url": "https://github.com/fastapi/sqlmodel/pull/1560",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "svlandeg",
+        "timestamp": "2025-09-16T13:08:32+00:00",
+        "file": "requirements-tests.txt",
+        "line_number": 0,
+        "content": "```suggestion\r\nmypy ==1.14.1\r\n```",
+        "type": "inline"
+      },
+      {
+        "reviewer": "svlandeg",
+        "timestamp": "2025-09-16T13:41:07+00:00",
+        "file": "sqlmodel/_compat.py",
+        "line_number": 126,
+        "content": "As on L425, where we're already ignoring it, the error is \r\n> Returning Any from function declared to return \"dict[str, Any]\"  [no-any-return]\r\n",
+        "type": "inline"
+      },
+      {
+        "reviewer": "svlandeg",
+        "timestamp": "2025-09-16T19:03:05+00:00",
+        "content": "The false positive notifications of the `X | Y` syntax go away when specifying `from __future__ import annotations` at the top of the file, as suggested [here](https://github.com/pydantic/pydantic-settings/issues/403#issuecomment-2995403050).\r\n\r\nBut even if this PR goes green, we shouldn't merge it. The `mypy` runs are still taking a ridiculous amount of time, something like 12-13 minutes. Each full CI run usually takes less than 1 minute when looking at current open PRs.\r\n\r\n",
+        "state": "DISMISSED",
+        "type": "general"
+      },
+      {
+        "reviewer": "tiangolo",
+        "timestamp": "2025-10-08T11:09:34+00:00",
+        "content": "This looks good to me, feel free to merge when ready @svlandeg 🚀 ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 10,
+      "loc_deleted": 9,
+      "num_files": 4,
+      "num_review_comments": 4,
+      "labels": [
+        "dependencies",
+        "python",
+        "internal"
+      ]
+    }
+  },
+  {
+    "pr_id": "tiangolo/sqlmodel#1595",
+    "repository": "tiangolo/sqlmodel",
+    "pr_number": 1595,
+    "title": "🐛 Fix attribute handling in `model_dump` for compatibility with the latest Pydantic versions",
+    "description": "+ ✏️   Fix reversion in model_dump attribute handling for pydantic v2.7 .. v2.10\r\n    + The `else` block added to fix linting errors (4b5ad42) for #1340 was obliterating the `'context'` and `'serialize_as_any'` attributes for versions >= 2.7 and < 2.11.\r\n    + Fix by initializing `extra_kwargs` and then setting on a per-version level\r\n+  💚 Fix linting from overriding `@final` FieldInfo\r\n+  💚 Add `exclude_computed_fields` from pydantic 2.12\r\n    + match the upstream interface to avoid mypy linting warning.\r\n    + pydantic added exclude_computed_fields in pydantic/pydantic-core#1780\r\n",
+    "author": "spazm",
+    "created_at": "2025-10-08T06:36:10+00:00",
+    "merged_at": "2025-10-08T10:33:47+00:00",
+    "url": "https://github.com/fastapi/sqlmodel/pull/1595",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "svlandeg",
+        "timestamp": "2025-10-08T09:36:39+00:00",
+        "content": "This is great, thanks so much @spazm !\r\n\r\nIt looks like your PR addresses 3 issues, 2 of which are specifically caused by `mypy` errors on the latest Pydantic release. These 2 are urgent to fix, and I would like to split them into a separate PR so it's easier to review and merge.\r\n\r\nThe other fix you mentioned about handling `model_dump` will definitely be looked at as well, but let's focus on getting the CI running first.\r\n\r\n<s>Please let me know if you have time to split this into a separate PR right now, otherwise I can do it.</s>",
+        "state": "COMMENTED",
+        "type": "general"
+      },
+      {
+        "reviewer": "tiangolo",
+        "timestamp": "2025-10-08T10:32:53+00:00",
+        "content": "Nice, thank you! 🙌 \n\nAnd thanks @svlandeg and @YuriiMotov for the help 🚀 ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 11,
+      "loc_deleted": 10,
+      "num_files": 1,
+      "num_review_comments": 2,
+      "labels": [
+        "bug"
+      ]
+    }
+  },
+  {
+    "pr_id": "tiangolo/sqlmodel#1289",
+    "repository": "tiangolo/sqlmodel",
+    "pr_number": 1289,
+    "title": "⬆️ Add support for Python 3.13",
+    "description": "This ended up needing more changes than I had expected:\r\n\r\n- To allow a valid resolution of dependencies, for Python 3.13 we need to allow a higher version of `typing-extensions`. This then allows us to pull in [Pydantic 2.8+](https://github.com/pydantic/pydantic/releases/tag/v2.8.0) which supports Python 3.13.\r\n- If we keep the upper version of Pydantic unbounded (`fastapi` imposes \"only\" `pydanctic<3.0.0`), we would currently pull in Pydantic v.2.10\r\n- Since [Pydantic 2.10.0](https://github.com/pydantic/pydantic/releases/tag/v2.10.0), the definition of `IncEx` has [changed](https://github.com/pydantic/pydantic/pull/10813), which means we need to change it as well or we'll get `mypy` errors complaining about violating the Liskov substitution principle\r\n- In `SQLModelMetaclass`, when we redefine `model_fields`, we'd get this `mypy` error:\r\n```\r\nsqlmodel\\main.py:482: error: Incompatible types in assignment (expression has type \"dict[str, sqlmodel.main.FieldInfo]\", base class \"ModelMetaclass\" defined the type as \"dict[str, pydantic.fields.FieldInfo]\")  [assignment]\r\n```\r\n<s>But I don't think we really need to redefine it? We'll be able to pass in a `sqlmodel.main.FieldInfo` object whereever a `pydantic.fields.FieldInfo` is expected, and the rest of the code base / tests / type checks don't seem to complain when we remove the redefinition (L482).</s>\r\n\r\nAs discussed below with Tiangolo, this PR now just adds an `ignore` statement for this.\r\n",
+    "author": "svlandeg",
+    "created_at": "2025-02-07T10:02:34+00:00",
+    "merged_at": "2025-03-06T18:58:41+00:00",
+    "url": "https://github.com/fastapi/sqlmodel/pull/1289",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "svlandeg",
+        "timestamp": "2025-02-24T11:02:39+00:00",
+        "content": "Test suite for Python 3.13 is currently failing because `pydantic-core==2.18.4` can't get installed with PyO3 0.21.2 on Python 3.13. We need PyO3 v0.22.0 or higher as [that version supports Python 3.13](https://github.com/PyO3/pyo3/releases/tag/v0.22.0), but I'm not sure yet why it's not pulling in the latest version - probably some other dependency is imposing an upper bound.",
+        "state": "COMMENTED",
+        "type": "general"
+      },
+      {
+        "reviewer": "tiangolo",
+        "timestamp": "2025-03-06T18:58:19+00:00",
+        "content": "Awesome, thank you for all the work put into this! :rocket: ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 14,
+      "loc_deleted": 7,
+      "num_files": 4,
+      "num_review_comments": 2,
+      "labels": [
+        "upgrade"
+      ]
+    }
+  },
+  {
+    "pr_id": "tiangolo/sqlmodel#1307",
+    "repository": "tiangolo/sqlmodel",
+    "pr_number": 1307,
+    "title": "💚 Fix CI test suite for Windows and MacOS",
+    "description": "Run the test suite not only on Ubuntu, but also on Windows and MacOS. \r\n\r\nTo avoid getting an exponential number of tests, limiting the testing of older Python versions to just a few different combinations. All in all, now the test suite should have 12 combinations to test (3x1x2 + 6), which is the same as before (6x2x1). So it shouldn't be slower, but it should cover more diverse cases.",
+    "author": "svlandeg",
+    "created_at": "2025-02-21T15:14:15+00:00",
+    "merged_at": "2025-09-17T22:19:41+00:00",
+    "url": "https://github.com/fastapi/sqlmodel/pull/1307",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "svlandeg",
+        "timestamp": "2025-04-28T10:32:17+00:00",
+        "file": "pyproject.toml",
+        "line_number": 84,
+        "content": "The coverage test kept on giving this error for either MacOS or Windows:\r\n```\r\nNo source for code: '/Users/runner/work/sqlmodel/sqlmodel/docs_src/__init__.py'.\r\n```\r\nThis is fixed by using the `relative_files` setting 🎉 ",
+        "type": "inline"
+      },
+      {
+        "reviewer": "svlandeg",
+        "timestamp": "2025-09-17T09:17:42+00:00",
+        "file": "tests/test_select_gen.py",
+        "line_number": 0,
+        "content": "The `env` stuff is basically the same fix as what was done in https://github.com/fastapi/sqlmodel/pull/969, but shortened.\r\n\r\n(we can probably also just keep the current way it's done on `main` - as long as the things in `os.environ` are passed to `env` as well)",
+        "type": "inline"
+      },
+      {
+        "reviewer": "tiangolo",
+        "timestamp": "2025-09-17T22:19:27+00:00",
+        "content": "Niceee! Thank you! 🙌 🚀 ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 24,
+      "loc_deleted": 10,
+      "num_files": 3,
+      "num_review_comments": 3,
+      "labels": [
+        "internal"
+      ]
+    }
+  },
+  {
+    "pr_id": "tiangolo/sqlmodel#1342",
+    "repository": "tiangolo/sqlmodel",
+    "pr_number": 1342,
+    "title": "✨ Add overload for `exec` method to support `insert`, `update`, `delete` statements",
+    "description": "To address #909",
+    "author": "seriaati",
+    "created_at": "2025-04-10T00:49:36+00:00",
+    "merged_at": "2025-09-17T21:37:02+00:00",
+    "url": "https://github.com/fastapi/sqlmodel/pull/1342",
+    "files_changed": [],
+    "human_reviews": [
+      {
+        "reviewer": "YuriiMotov",
+        "timestamp": "2025-08-15T14:02:47+00:00",
+        "content": "LGTM!\r\n\r\nThis fixes the typing issue when we use `exec` method with `insert`, `update` or `delete` statements. Currently it works, but type checkers raise warnings. This PR fixes this.\r\n\r\n@seriaati, thanks for working on this!",
+        "state": "APPROVED",
+        "type": "general"
+      },
+      {
+        "reviewer": "tiangolo",
+        "timestamp": "2025-09-17T21:36:51+00:00",
+        "content": "Thanks @seriaati! 🚀 \n\nThis will be available in SQLModel 0.0.25, released in the next few hours. 🎉 ",
+        "state": "APPROVED",
+        "type": "general"
+      }
+    ],
+    "metadata": {
+      "loc_added": 36,
+      "loc_deleted": 2,
+      "num_files": 2,
+      "num_review_comments": 2,
+      "labels": [
+        "feature"
+      ]
+    }
+  }
+]

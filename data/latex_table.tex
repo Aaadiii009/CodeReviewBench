@@ -1,0 +1,21 @@
+% LaTeX Table for CodeReviewBench Dataset
+% Copy this into your paper's Section 4 (Experimental Setup)
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Repository} & \textbf{PRs} & \textbf{Reviews} & \textbf{Avg Rev/PR} & \textbf{Avg LOC} \\
+\midrule
+django               &  10 &   91 &  9.1 &     56 \\
+fastapi              &  10 &   33 &  3.3 &    115 \\
+playwright-python    &  10 &   50 &  5.0 &    316 \\
+sqlmodel             &   7 &   16 &  2.3 &     32 \\
+\midrule
+\textbf{Total/Average} & \textbf{37} & \textbf{190} & \textbf{5.1} & \textbf{138} \\
+\bottomrule
+\end{tabular}
+\caption{Dataset Statistics: Collected Pull Requests and Review Comments}
+\label{tab:dataset_stats}
+\end{table}
